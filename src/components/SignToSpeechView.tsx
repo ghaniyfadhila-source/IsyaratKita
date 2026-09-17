@@ -686,8 +686,8 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                 )}
 
                 {/* Top HUD */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span
                       className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md border ${
                         handDetected
@@ -703,30 +703,38 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                       {handDetected ? 'Tangan Terbaca Jelas' : 'Arahkan Tangan ke Kamera...'}
                     </span>
 
-                    <span className="text-xs text-white/80 bg-black/60 px-2.5 py-1 rounded-full font-mono backdrop-blur-xs border border-white/10">
+                    <span className="text-xs text-white/80 bg-black/60 px-2.5 py-1 rounded-full font-mono backdrop-blur-xs border border-white/10 hidden sm:inline">
                       {fps} FPS
                     </span>
 
-                    <span className="text-[11px] text-teal-200 bg-teal-950/80 px-2.5 py-1 rounded-full font-semibold backdrop-blur-xs border border-teal-500/40">
+                    <span className="text-[11px] text-teal-200 bg-teal-950/80 px-2.5 py-1 rounded-full font-semibold backdrop-blur-xs border border-teal-500/40 hidden md:inline">
                       {detectionFilterMode === 'alphabet' ? 'Mode: Huruf (A-Z)' : detectionFilterMode === 'words' ? 'Mode: Kata' : 'Mode: Otomatis'}
                     </span>
                   </div>
 
-                  {/* Hold to Auto-commit Indicator */}
-                  {autoCommit && handDetected && (
-                    <div className="flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-teal-500/40">
-                      <Zap className="w-3.5 h-3.5 text-teal-400 animate-pulse" />
-                      <span className="text-[11px] font-mono text-teal-200 font-bold">
-                        Menahan: {Math.round(holdProgress)}%
-                      </span>
-                      <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                        <div
-                          className="bg-teal-400 h-full transition-all duration-75"
-                          style={{ width: `${holdProgress}%` }}
-                        />
+                  <div className="flex items-center gap-2">
+                    {/* Watermark badge */}
+                    <span className="text-[11px] font-medium text-white/90 bg-black/60 px-2.5 py-1 rounded-full backdrop-blur-xs border border-white/15 flex items-center gap-1.5 shadow-2xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                      <span>IsyaratKita &bull; Ghaniy Fadhila</span>
+                    </span>
+
+                    {/* Hold to Auto-commit Indicator */}
+                    {autoCommit && handDetected && (
+                      <div className="flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-teal-500/40">
+                        <Zap className="w-3.5 h-3.5 text-teal-400 animate-pulse" />
+                        <span className="text-[11px] font-mono text-teal-200 font-bold">
+                          Menahan: {Math.round(holdProgress)}%
+                        </span>
+                        <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className="bg-teal-400 h-full transition-all duration-75"
+                            style={{ width: `${holdProgress}%` }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
 
                 {/* Framing Center Guide if hand not yet in frame */}

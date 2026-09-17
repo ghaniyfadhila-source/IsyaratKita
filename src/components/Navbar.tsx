@@ -1,9 +1,10 @@
 import React from 'react';
-import { BookOpen, CheckCircle2, Volume2, Sparkles, HandMetal } from 'lucide-react';
+import { BookOpen, CheckCircle2, Volume2, Sparkles, HandMetal, MessageSquareText } from 'lucide-react';
 
 interface NavbarProps {
   onOpenDictionary: () => void;
   onOpenTestGuide: () => void;
+  onOpenContact: () => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
 }
@@ -11,6 +12,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenDictionary,
   onOpenTestGuide,
+  onOpenContact,
   soundEnabled,
   onToggleSound
 }) => {
@@ -64,6 +66,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             <BookOpen className="w-4 h-4 text-slate-600" />
             <span className="hidden sm:inline">Kamus Isyarat</span>
             <span className="sm:hidden">Kamus</span>
+          </button>
+
+          {/* Contact Button */}
+          <button
+            id="btn-open-contact"
+            onClick={onOpenContact}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition-colors shadow-2xs"
+            title="Hubungi pengembang via WhatsApp, Instagram, GitHub & Portofolio"
+          >
+            <MessageSquareText className="w-4 h-4 text-amber-700" />
+            <span>Kontak</span>
           </button>
 
           {/* Sound Mute/Unmute Toggle */}

@@ -6,15 +6,17 @@ import { SpeechToSignView } from './components/SpeechToSignView';
 import { SignToSpeechView } from './components/SignToSpeechView';
 import { DictionaryModal } from './components/DictionaryModal';
 import { TestingGuideModal } from './components/TestingGuideModal';
+import { ContactModal } from './components/ContactModal';
 import { HistoryPanel } from './components/HistoryPanel';
 import { getSavedHistory, saveHistoryItem, clearHistory } from './utils/historyStorage';
-import { Sparkles, CheckCircle2, HeartHandshake, ShieldCheck, History } from 'lucide-react';
+import { Sparkles, CheckCircle2, HeartHandshake, ShieldCheck, History, Github } from 'lucide-react';
 
 export default function App() {
   const [currentMode, setCurrentMode] = useState<TranslationMode>('speech-to-sign');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [isDictionaryOpen, setIsDictionaryOpen] = useState<boolean>(false);
   const [isTestGuideOpen, setIsTestGuideOpen] = useState<boolean>(false);
+  const [isContactOpen, setIsContactOpen] = useState<boolean>(false);
   const [history, setHistory] = useState<TranslationHistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState<boolean>(true);
 
@@ -40,6 +42,7 @@ export default function App() {
       <Navbar
         onOpenDictionary={() => setIsDictionaryOpen(true)}
         onOpenTestGuide={() => setIsTestGuideOpen(true)}
+        onOpenContact={() => setIsContactOpen(true)}
         soundEnabled={soundEnabled}
         onToggleSound={() => setSoundEnabled((prev) => !prev)}
       />
@@ -124,11 +127,24 @@ export default function App() {
           <div className="flex items-center gap-2">
             <HeartHandshake className="w-4 h-4 text-teal-600" />
             <span>
-              <strong>IsyaratKita</strong> • Dibangun dengan prinsip aksesibilitas komunikasi inklusif
+              <strong>IsyaratKita</strong> • Dibuat oleh{' '}
+              <button
+                onClick={() => setIsContactOpen(true)}
+                className="font-bold text-teal-700 hover:text-teal-900 hover:underline cursor-pointer"
+              >
+                Ghaniy Fadhila
+              </button>
             </span>
           </div>
-          <div className="flex items-center gap-4 text-[11px] text-slate-600">
+          <div className="flex items-center gap-3 text-[11px] text-slate-600 flex-wrap justify-center">
             <span>Standar SIBI (Sistem Isyarat Bahasa Indonesia)</span>
+            <span>•</span>
+            <button
+              onClick={() => setIsContactOpen(true)}
+              className="hover:text-teal-700 font-semibold underline decoration-dotted"
+            >
+              Kontak Pengembang
+            </button>
             <span>•</span>
             <span className="flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
@@ -149,6 +165,12 @@ export default function App() {
         isOpen={isTestGuideOpen}
         onClose={() => setIsTestGuideOpen(false)}
         onGoToMode={(mode) => setCurrentMode(mode)}
+      />
+
+      {/* Contact & Social Links Modal */}
+      <ContactModal
+        isOpen={isContactOpen}
+        onClose={() => setIsContactOpen(false)}
       />
     </div>
   );
