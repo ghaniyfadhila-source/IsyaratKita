@@ -14,7 +14,7 @@
 **Aplikasi web penerjemah dua arah interaktif antara Bahasa Isyarat SIBI (Sistem Isyarat Bahasa Indonesia) dan Suara/Teks secara real-time.**  
 *Menjembatani komunikasi inklusif yang mudah, cepat, dan ramah aksesibilitas bagi teman Tuli dan teman Dengar.*
 
-[✨ Demo Langsung](https://ghaniyfadhila-source.github.io) • [📖 Panduan Penggunaan](#-panduan-penggunaan) • [🛠️ Teknologi](#%EF%B8%8F-arsitektur--teknologi) • [📬 Kontak Pengembang](#-kontak--pengembang)
+[✨ Demo Langsung](https://ghaniyfadhilaltaf.my.id) • [📖 Panduan Penggunaan](#-panduan-penggunaan) • [🛠️ Teknologi](#%EF%B8%8F-arsitektur--teknologi) • [📬 Kontak Pengembang](#-kontak--pengembang)
 
 </div>
 
@@ -174,10 +174,10 @@ IsyaratKita/
 
 Dibuat dengan ❤️ oleh **Ghaniy Fadhila**:
 
-- 💬 **WhatsApp**: [Hubungi via WhatsApp](https://wa.me/6281234567890?text=Halo%20Ghaniy,%20saya%20tertarik%20dengan%20proyek%20IsyaratKita)
-- 📸 **Instagram**: [@ghaniyfadhila](https://instagram.com/ghaniyfadhila)
+- 💬 **WhatsApp**: [Hubungi +62 831-0355-2129](https://wa.me/6283103552129?text=Halo%20Ghaniy,%20saya%20tertarik%20dengan%20proyek%20IsyaratKita)
+- 📸 **Instagram**: [@jessaarrons](https://instagram.com/jessaarrons)
 - 💻 **GitHub**: [@ghaniyfadhila-source](https://github.com/ghaniyfadhila-source)
-- 🌐 **Website Portofolio**: [ghaniyfadhila-source.github.io](https://ghaniyfadhila-source.github.io)
+- 🌐 **Website Portofolio**: [ghaniyfadhilaltaf.my.id](https://ghaniyfadhilaltaf.my.id)
 - ✉️ **Email**: `ghaniyfadhila@gmail.com`
 
 ---
