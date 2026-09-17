@@ -1,0 +1,11 @@
+{
+  "name": "IsyaratKita",
+  "description": "Platform Penerjemah Bahasa Isyarat SIBI Dua Arah Berbasis AI untuk Komunikasi Inklusif",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
