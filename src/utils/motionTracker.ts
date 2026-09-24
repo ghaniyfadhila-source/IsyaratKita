@@ -16,6 +16,8 @@ export interface DynamicGestureCandidate {
   gestureType: 'letter' | 'word' | 'greeting';
   trail: { x: number; y: number }[];
   immediateCommit?: boolean;
+  requiresVerification?: boolean;
+  verificationWindowMs?: number;
 }
 
 /**
@@ -183,13 +185,10 @@ export class HandMotionTracker {
   ): DynamicGestureCandidate | null {
     // 1. Check if we are currently in a LATCHED state from a recent detection
     if (this.latchedCandidate && now < this.latchExpiresAt) {
-      const isFirst = !this.hasTriggeredImmediateCommit;
-      if (isFirst) {
-        this.hasTriggeredImmediateCommit = true;
-      }
       return {
         ...this.latchedCandidate,
-        immediateCommit: isFirst
+        immediateCommit: false,
+        requiresVerification: false
       };
     }
 
@@ -202,16 +201,17 @@ export class HandMotionTracker {
       return null;
     }
 
-    // CRITICAL GUARD: Dynamic gestures strictly require intentional, active hand motion.
-    // If currentMotionEnergy is low (< 26), the user is holding a static pose (e.g. A, B, D, I, etc.).
-    // Dynamic gestures MUST NOT hijack static alphabet letters when the hand is stationary!
-    if (this.currentMotionEnergy < 26) {
+    const sens = this.sensitivity;
+    const palm = this.currentPalmSize;
+
+    // Dynamic gestures strictly require intentional hand motion.
+    // Scale threshold dynamically with user sensitivity so natural movements are caught smoothly.
+    const minMotionThreshold = Math.max(5, 11 / sens);
+    if (this.currentMotionEnergy < minMotionThreshold) {
       return null;
     }
 
     const { thumb, index, middle, ring, pinky } = fingerStates;
-    const palm = this.currentPalmSize;
-    const sens = this.sensitivity;
 
     // -------------------------------------------------------------
     // GESTURE 1: HURUF 'Z' (Index finger tracing 'Z' zigzag)
@@ -277,19 +277,22 @@ export class HandMotionTracker {
     }
 
     // -------------------------------------------------------------
-    // GESTURE 4: SAPAAN 'HALO' (Waving open hand side-to-side)
+    // GESTURE 4: SAPAAN 'HALO' (Waving open hand side-to-side OR salute at temple)
     // -------------------------------------------------------------
     // Tolerant: Hand open (at least 3 fingers extended)
     const openFingerCount = [index, middle, ring, pinky].filter(Boolean).length;
     if (openFingerCount >= 3) {
       const waveMatched = this.detectWavingMotion(this.wristHistory, palm, sens);
-      if (waveMatched && this.canTrigger('HALO', now)) {
+      const saluteMatched = this.detectTempleSalute(this.wristHistory, palm, sens);
+      if ((waveMatched || saluteMatched) && this.canTrigger('HALO', now)) {
         return this.triggerGesture(
           {
             label: 'SIBI HALO',
             word: 'Halo',
             confidence: 96,
-            description: 'Lambaian tangan ramah membuka salam (Halo)',
+            description: saluteMatched
+              ? 'Telapak terbuka di pelipis bergerak salam ke luar depan (Halo / Salam)'
+              : 'Lambaian tangan ramah membuka salam (Halo)',
             gestureType: 'greeting',
             trail: this.wristHistory.slice(-16).map((p) => ({ x: p.x, y: p.y }))
           },
@@ -322,7 +325,8 @@ export class HandMotionTracker {
     // -------------------------------------------------------------
     // GESTURE 6: KATA 'BAGUS' (Thumbs Up / Mantap)
     // -------------------------------------------------------------
-    if (thumb && !index && !middle && !ring && !pinky) {
+    // Must be an active upward thumbs-up gesture, never hijack static 'A'
+    if (thumb && !index && !middle && !ring && !pinky && staticSign !== 'A') {
       const thumbMatched = this.detectThumbsUp(this.thumbTipHistory, this.wristHistory, palm, sens);
       if (thumbMatched && this.canTrigger('BAGUS', now)) {
         return this.triggerGesture(
@@ -387,8 +391,8 @@ export class HandMotionTracker {
    */
   private triggerGesture(candidate: DynamicGestureCandidate, now: number): DynamicGestureCandidate {
     this.latchedCandidate = candidate;
-    this.latchExpiresAt = now + 1100; // Hold steady in UI for 1.1s
-    this.hasTriggeredImmediateCommit = true;
+    this.latchExpiresAt = now + 1400; // Hold steady in UI for 1.4s
+    this.hasTriggeredImmediateCommit = false;
     this.lastTriggerTimes[candidate.label] = now;
 
     // Reset active draw trail after successful gesture trigger
@@ -396,7 +400,9 @@ export class HandMotionTracker {
 
     return {
       ...candidate,
-      immediateCommit: true
+      immediateCommit: false,
+      requiresVerification: true,
+      verificationWindowMs: 480
     };
   }
 
@@ -433,7 +439,7 @@ export class HandMotionTracker {
     const spanY = (maxY - minY) / palm;
 
     // Require natural displacement in both X and Y relative to palm size
-    const minSpan = 0.18 / sens;
+    const minSpan = 0.13 / sens;
     if (spanX < minSpan || spanY < minSpan) return false;
 
     // Check horizontal reversals with adaptive step
@@ -443,7 +449,7 @@ export class HandMotionTracker {
 
     for (let i = step; i < pts.length; i += step) {
       const dx = (pts[i].x - pts[i - step].x) / palm;
-      if (Math.abs(dx) > 0.035 / sens) {
+      if (Math.abs(dx) > 0.028 / sens) {
         const dir = dx > 0 ? 1 : -1;
         if (lastDir !== 0 && dir !== lastDir) {
           reversals++;
@@ -458,9 +464,9 @@ export class HandMotionTracker {
     const lowestDrop = (maxY - startY) / palm;
     const overallDrop = (endY - startY) / palm;
 
-    const isDownward = lowestDrop > 0.12 / sens || overallDrop > 0.06 / sens;
+    const isDownward = lowestDrop > 0.07 / sens || overallDrop > 0.035 / sens;
 
-    return (reversals >= 2 || (reversals >= 1 && spanX > 0.22 / sens)) && isDownward;
+    return (reversals >= 2 || (reversals >= 1 && spanX > 0.18 / sens)) && isDownward;
   }
 
   /**
@@ -468,7 +474,7 @@ export class HandMotionTracker {
    * Pinky moves down, then hooks upward/sideways at the bottom.
    */
   private detectJPattern(pts: TrajectoryPoint[], palm: number, sens: number): boolean {
-    if (pts.length < 6) return false;
+    if (pts.length < 5) return false;
 
     let maxY = pts[0].y;
     let maxIndex = 0;
@@ -479,12 +485,12 @@ export class HandMotionTracker {
       }
     }
 
-    // The lowest point (peak of downstroke) must happen in the middle-to-late movement
-    if (maxIndex < Math.floor(pts.length * 0.25)) return false;
+    // The lowest point (peak of downstroke) must happen in middle-to-late movement
+    if (maxIndex < Math.floor(pts.length * 0.2)) return false;
 
     const startY = pts[0].y;
     const downstroke = (maxY - startY) / palm;
-    if (downstroke < 0.14 / sens) return false;
+    if (downstroke < 0.09 / sens) return false;
 
     // After reaching bottom, the hook moves upward or curves sideways
     if (maxIndex < pts.length - 1) {
@@ -495,7 +501,7 @@ export class HandMotionTracker {
       const hookUp = (maxY - endY) / palm;
       const hookSide = Math.abs(endX - lowestX) / palm;
 
-      return hookUp > 0.035 / sens || hookSide > 0.045 / sens;
+      return hookUp > 0.02 / sens || hookSide > 0.025 / sens;
     }
 
     return true;
@@ -512,7 +518,7 @@ export class HandMotionTracker {
     palm: number,
     sens: number
   ): boolean {
-    if (tipPts.length < 8 || wristPts.length < 8) return false;
+    if (tipPts.length < 6 || wristPts.length < 6) return false;
 
     // Compute relative X difference (isolates finger swing from body sway)
     const len = Math.min(tipPts.length, wristPts.length);
@@ -528,7 +534,7 @@ export class HandMotionTracker {
 
       totalRelativeTravel += Math.abs(dRelX);
 
-      if (Math.abs(dRelX) > 0.035 / sens) {
+      if (Math.abs(dRelX) > 0.025 / sens) {
         const dir = dRelX > 0 ? 1 : -1;
         if (lastDir !== 0 && dir !== lastDir) {
           reversals++;
@@ -537,16 +543,16 @@ export class HandMotionTracker {
       }
     }
 
-    // Must have at least 2 directional reversals (swing left-right-left)
-    return reversals >= 2 && totalRelativeTravel > 0.22 / sens;
+    // At least 1 clear reversal or multiple gentle swings
+    return (reversals >= 1 && totalRelativeTravel > 0.15 / sens) || (reversals >= 2 && totalRelativeTravel > 0.10 / sens);
   }
 
   /**
-   * HALO PATTERN:
-   * Hand / wrist actively oscillates horizontally (waving at least twice).
+   * HALO PATTERN (Waving):
+   * Hand / wrist actively oscillates horizontally (waving at least once or twice).
    */
   private detectWavingMotion(pts: TrajectoryPoint[], palm: number, sens: number): boolean {
-    if (pts.length < 8) return false;
+    if (pts.length < 6) return false;
 
     let reversals = 0;
     let lastDir = 0;
@@ -557,7 +563,7 @@ export class HandMotionTracker {
       const dx = (pts[i].x - pts[i - step].x) / palm;
       totalX += Math.abs(dx);
 
-      if (Math.abs(dx) > 0.038 / sens) {
+      if (Math.abs(dx) > 0.026 / sens) {
         const dir = dx > 0 ? 1 : -1;
         if (lastDir !== 0 && dir !== lastDir) {
           reversals++;
@@ -566,16 +572,32 @@ export class HandMotionTracker {
       }
     }
 
-    // Real waving requires at least 2 reversals and significant horizontal travel
-    return reversals >= 2 && totalX > 0.28 / sens;
+    return (reversals >= 1 && totalX > 0.16 / sens) || (reversals >= 2 && totalX > 0.12 / sens);
+  }
+
+  /**
+   * HALO PATTERN (Temple / Forehead Salute):
+   * Hand held near temple/forehead and moving smoothly outward/forward.
+   */
+  private detectTempleSalute(pts: TrajectoryPoint[], palm: number, sens: number): boolean {
+    if (pts.length < 6) return false;
+    const start = pts[0];
+    const end = pts[pts.length - 1];
+
+    // Starts in upper quadrant near face/temple level (y < 0.52)
+    const isAtTempleHeight = start.y < 0.52;
+    const dx = Math.abs(end.x - start.x) / palm;
+    const dz = (end.z - start.z) / palm;
+
+    return isAtTempleHeight && (dx > 0.10 / sens || dz < -0.06 / sens);
   }
 
   /**
    * YA PATTERN:
-   * Fist actively moves up and down (nodding) with at least 2 reversals.
+   * Fist actively moves up and down (nodding).
    */
   private detectVerticalNod(pts: TrajectoryPoint[], palm: number, sens: number): boolean {
-    if (pts.length < 8) return false;
+    if (pts.length < 6) return false;
 
     let reversals = 0;
     let lastDir = 0;
@@ -586,7 +608,7 @@ export class HandMotionTracker {
       const dy = (pts[i].y - pts[i - step].y) / palm;
       totalY += Math.abs(dy);
 
-      if (Math.abs(dy) > 0.032 / sens) {
+      if (Math.abs(dy) > 0.024 / sens) {
         const dir = dy > 0 ? 1 : -1;
         if (lastDir !== 0 && dir !== lastDir) {
           reversals++;
@@ -595,12 +617,13 @@ export class HandMotionTracker {
       }
     }
 
-    return reversals >= 2 && totalY > 0.22 / sens;
+    return (reversals >= 1 && totalY > 0.15 / sens) || (reversals >= 2 && totalY > 0.10 / sens);
   }
 
   /**
    * BAGUS PATTERN:
-   * Thumbs-up upward motion or distinctly elevated thumb held prominent.
+   * Requires deliberate upward thrust of the thumb with high vertical elevation.
+   * Standard 'A' fist resting or translating will NOT trigger this.
    */
   private detectThumbsUp(
     thumbPts: TrajectoryPoint[],
@@ -608,14 +631,15 @@ export class HandMotionTracker {
     palm: number,
     sens: number
   ): boolean {
-    if (thumbPts.length < 6 || wristPts.length < 6) return false;
+    if (thumbPts.length < 5 || wristPts.length < 5) return false;
     const latestThumb = thumbPts[thumbPts.length - 1];
     const latestWrist = wristPts[wristPts.length - 1];
 
-    // Must be moving upwards or held with very high vertical elevation (distinct from standard fist 'A')
+    // Must be held with very high vertical elevation (thumb pointing high into the air)
     const verticalElevation = (latestWrist.y - latestThumb.y) / palm;
     const upwardSpeed = thumbPts.length >= 4 ? (thumbPts[0].y - latestThumb.y) / palm : 0;
-    return verticalElevation > 0.85 / sens && (upwardSpeed > 0.12 || this.currentMotionEnergy > 32);
+
+    return verticalElevation > 1.02 / sens && (upwardSpeed > 0.12 / sens || verticalElevation > 1.25 / sens);
   }
 
   /**
@@ -623,7 +647,7 @@ export class HandMotionTracker {
    * Flat hand moving forward or downward from upper chest/chin.
    */
   private detectForwardPush(pts: TrajectoryPoint[], palm: number, sens: number): boolean {
-    if (pts.length < 6) return false;
+    if (pts.length < 5) return false;
 
     const start = pts[0];
     const end = pts[pts.length - 1];
@@ -631,8 +655,8 @@ export class HandMotionTracker {
     const dy = (end.y - start.y) / palm;
     const dz = (end.z - start.z) / palm;
 
-    // Movement is downward toward camera / forward push
-    return dy > 0.12 / sens || dz < -0.10 / sens;
+    // Movement is forward toward camera / downward forward push
+    return dy > 0.08 / sens || dz < -0.06 / sens;
   }
 
   /**
@@ -641,7 +665,7 @@ export class HandMotionTracker {
    * Uses monotonic angular accumulation around the trajectory centroid.
    */
   private detectCircularRub(pts: TrajectoryPoint[], palm: number, sens: number): boolean {
-    if (pts.length < 8) return false;
+    if (pts.length < 6) return false;
 
     // Compute centroid
     let cx = 0, cy = 0;
@@ -660,7 +684,7 @@ export class HandMotionTracker {
     }
 
     // Needs to have a natural circular diameter
-    if (maxRadius < 0.08 / sens) return false;
+    if (maxRadius < 0.05 / sens) return false;
 
     // Accumulate directional angle change
     let prevAngle = Math.atan2(pts[0].y - cy, pts[0].x - cx);
@@ -675,8 +699,8 @@ export class HandMotionTracker {
       prevAngle = currAngle;
     }
 
-    // Require at least ~130 degrees of circular trajectory
-    return Math.abs(totalAngleDelta) > (2.2 / sens);
+    // Require at least ~95 degrees of circular trajectory
+    return Math.abs(totalAngleDelta) > (1.65 / sens);
   }
 }
 

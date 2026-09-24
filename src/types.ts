@@ -47,7 +47,12 @@ export interface HandGestureResult {
   gestureType?: 'letter' | 'word' | 'greeting';
   motionTrail?: { x: number; y: number }[];
   immediateCommit?: boolean;
+  requiresVerification?: boolean;
+  verificationWindowMs?: number;
   motionEnergy?: number;
+  stabilizing?: boolean;
+  isTwoHanded?: boolean;
+  twoHandsDetected?: boolean;
 }
 
 export interface GeminiAnalysisResult {

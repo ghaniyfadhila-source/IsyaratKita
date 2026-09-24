@@ -61,24 +61,30 @@ export function evaluateFingerStates(landmarks: NormalizedLandmark[]): FingerSta
   // Scale reference: palm size (wrist to middle MCP)
   const palmSize = Math.max(0.01, calcDistance(wrist, middleMcp));
 
-  // 4 main fingers:
-  // Extended if tip distance from wrist is significantly greater than PIP from wrist
-  // and tip is well separated from its MCP
-  const indexExtended =
-    calcDistance(indexTip, wrist) > calcDistance(indexPip, wrist) * 1.12 &&
-    calcDistance(indexTip, indexMcp) > calcDistance(indexPip, indexMcp) * 1.05;
+  // Helper to determine if a finger is extended:
+  // 1. Upward orientation (tip is higher than pip in camera coordinates when hand is raised)
+  // 2. Euclidean distance (tip further from wrist than pip and mcp)
+  const isFingerExtended = (
+    tip: NormalizedLandmark,
+    pip: NormalizedLandmark,
+    mcp: NormalizedLandmark
+  ): boolean => {
+    // Upward extension in 2D frame (y axis points down in normalized coordinates)
+    const isUpward = wrist.y - tip.y > (wrist.y - pip.y) * 1.02 && tip.y < pip.y;
+    // Radial extension away from wrist
+    const distTipWrist = calcDistance(tip, wrist);
+    const distPipWrist = calcDistance(pip, wrist);
+    const distTipMcp = calcDistance(tip, mcp);
+    const distPipMcp = calcDistance(pip, mcp);
+    const isLongerThanPip = distTipWrist > distPipWrist * 1.04 && distTipMcp > distPipMcp * 0.95;
 
-  const middleExtended =
-    calcDistance(middleTip, wrist) > calcDistance(middlePip, wrist) * 1.12 &&
-    calcDistance(middleTip, middleMcp) > calcDistance(middlePip, middleMcp) * 1.05;
+    return isUpward || isLongerThanPip;
+  };
 
-  const ringExtended =
-    calcDistance(ringTip, wrist) > calcDistance(ringPip, wrist) * 1.12 &&
-    calcDistance(ringTip, ringMcp) > calcDistance(ringPip, ringMcp) * 1.05;
-
-  const pinkyExtended =
-    calcDistance(pinkyTip, wrist) > calcDistance(pinkyPip, wrist) * 1.12 &&
-    calcDistance(pinkyTip, pinkyMcp) > calcDistance(pinkyPip, pinkyMcp) * 1.05;
+  const indexExtended = isFingerExtended(indexTip, indexPip, indexMcp);
+  const middleExtended = isFingerExtended(middleTip, middlePip, middleMcp);
+  const ringExtended = isFingerExtended(ringTip, ringPip, ringMcp);
+  const pinkyExtended = isFingerExtended(pinkyTip, pinkyPip, pinkyMcp);
 
   // Thumb extension:
   // Check distance away from wrist and outward from pinky/palm base
@@ -219,6 +225,8 @@ export function classifySibiSign(
         gestureType: dynamicCandidate.gestureType,
         motionTrail: dynamicCandidate.trail,
         immediateCommit: dynamicCandidate.immediateCommit,
+        requiresVerification: dynamicCandidate.requiresVerification,
+        verificationWindowMs: dynamicCandidate.verificationWindowMs,
         motionEnergy: globalMotionTracker.getMotionEnergy()
       };
     }
@@ -243,9 +251,21 @@ export function classifySibiSign(
   }
 
   // -------------------------------------------------------------
-  // RULE 3: 'ILY' / 'SAYANG' (Thumb, Index, Pinky extended)
+  // RULE 3: 'ILY' / 'SAYANG' (Thumb, Index, Pinky extended, Middle & Ring tightly curled)
   // -------------------------------------------------------------
-  else if (thumb && index && !middle && !ring && pinky && mode !== 'alphabet') {
+  else if (
+    thumb &&
+    index &&
+    pinky &&
+    !middle &&
+    !ring &&
+    mode !== 'alphabet' &&
+    normDist(indexTip, indexMcp) > 0.82 &&
+    normDist(pinkyTip, pinkyMcp) > 0.72 &&
+    normDist(indexTip, pinkyTip) > 0.65 &&
+    normDist(middleTip, middleMcp) < 0.62 &&
+    normDist(ringTip, ringMcp) < 0.62
+  ) {
     bestSign = 'SAYANG';
     confidence = 94;
     description = 'Ibu jari, telunjuk, dan kelingking terbuka (I-Love-You / Sayang)';
@@ -281,10 +301,31 @@ export function classifySibiSign(
         description = 'Telunjuk tegak ke atas dan ibu jari terbuka 90° membentuk huruf L';
       }
     } else {
-      // Only index extended -> 'D'
-      bestSign = 'D';
-      confidence = 93;
-      description = 'Telunjuk tegak lurus ke atas, jari lain mengepal (D)';
+      // Only index extended -> 'D' vs 'Saya' vs 'Kamu'
+      if (mode !== 'alphabet' && indexTip.y > indexMcp.y + 0.10 * palmSize) {
+        // Pointing down / inward towards chest
+        bestSign = 'Saya';
+        confidence = 94;
+        description = 'Jari telunjuk diarahkan menunjuk mantap ke dada sendiri (Saya / Aku)';
+        gestureType = 'word';
+      } else if (
+        mode !== 'alphabet' &&
+        typeof indexTip.z === 'number' &&
+        typeof indexMcp.z === 'number' &&
+        indexTip.z < indexMcp.z - 0.04 &&
+        Math.abs(indexTip.y - indexMcp.y) < 0.40 * palmSize
+      ) {
+        // Pointing straight forward at audience / camera
+        bestSign = 'Kamu';
+        confidence = 93;
+        description = 'Jari telunjuk menunjuk lurus ke arah lawan bicara (Kamu / Anda)';
+        gestureType = 'word';
+      } else {
+        // Normal D (index pointing straight up)
+        bestSign = 'D';
+        confidence = 95;
+        description = 'Telunjuk tegak lurus ke atas, jari lain mengepal (D)';
+      }
     }
   }
 
@@ -357,13 +398,25 @@ export function classifySibiSign(
   }
 
   // -------------------------------------------------------------
-  // RULE 9: 'B' / TELAPAK TERBUKA (4 or 5 fingers extended)
+  // RULE 9: 'B' / TELAPAK TERBUKA / 'HALO' (4 or 5 fingers extended)
+  // In SIBI: 4 fingers (telunjuk, tengah, manis, kelingking) tegak lurus ke atas
+  // rapat satu sama lain, ibu jari melipat di telapak atau terbuka.
   // -------------------------------------------------------------
-  else if (index && middle && ring && pinky) {
-    if (thumb) {
+  else if (
+    (index && middle && ring && pinky) ||
+    (index && middle && ring && (pinkyTip.y < pinkyPip.y || pinkyTip.y < pinkyMcp.y)) ||
+    (index && middle && pinky && (ringTip.y < ringPip.y || ringTip.y < ringMcp.y)) ||
+    (index && ring && pinky && (middleTip.y < middlePip.y || middleTip.y < middleMcp.y))
+  ) {
+    if (mode !== 'alphabet' && wrist.y < 0.38 && indexTip.y < 0.28) {
+      bestSign = 'Halo';
+      confidence = 94;
+      description = 'Telapak tangan tegak terbuka di pelipis (Halo / Salam)';
+      gestureType = 'greeting';
+    } else if (thumb) {
       bestSign = 'B';
-      confidence = 90;
-      description = 'Telapak tangan terbuka tegak lurus dengan lima jari terentang';
+      confidence = 92;
+      description = 'Telapak tangan terbuka tegak lurus dengan lima jari terentang (B)';
     } else {
       bestSign = 'B';
       confidence = 96;
@@ -372,83 +425,122 @@ export function classifySibiSign(
   }
 
   // -------------------------------------------------------------
-  // RULE 10: 'C' vs 'O' (Curved Handshapes)
+  // RULE 10: 'O' vs 'C' (Curved Handshapes with open aperture)
+  // Evaluated when fingers arch in a curve and thumb forms an open or closed loop
+  // -------------------------------------------------------------
+  const indexAngle = calcAngle(indexMcp, indexPip, indexTip);
+  const middleAngle = calcAngle(middleMcp, middlePip, middleTip);
+  const isCurvedFingers = indexAngle < 165 && middleAngle < 165;
+
+  // In 'C' and 'O', the thumb is NOT tucked flat against the side of the fist
+  const thumbExtendedFromKnuckle =
+    normDist(thumbTip, indexMcp) > 0.46 ||
+    normDist(thumbTip, indexPip) > 0.46 ||
+    normDist(thumbTip, middleMcp) > 0.48;
+
+  // In 'O', thumb tip meets fingertips to form a closed loop (< 0.34)
+  const isClosedLoop = distThumbIndex < 0.34 || (distThumbIndex < 0.38 && distThumbMiddle < 0.38);
+  const isHollowCircle = normDist(indexPip, thumbMcp) > 0.35;
+
+  // In 'C', thumb tip and index/middle tips form an open arc (0.30 to 1.35)
+  // Fingertips are projected forward into space (not clenched flat into lower palm)
+  const isOpenCAperture =
+    (distThumbIndex >= 0.30 && distThumbIndex <= 1.35) ||
+    (distThumbMiddle >= 0.30 && distThumbMiddle <= 1.35);
+  const isFingertipsArchedOut = normDist(indexTip, wrist) > 0.55;
+
+  // Explicit check for 'A' fist so 'A' never triggers 'C'
+  // In 'A', the thumb sits snug along the lateral side of the folded index finger
+  const isHoldingAFist =
+    normDist(thumbTip, indexMcp) <= 0.46 &&
+    normDist(thumbTip, indexPip) <= 0.46 &&
+    thumbTip.y < indexMcp.y + 0.08;
+
+  if (isCurvedFingers && isClosedLoop && isHollowCircle && thumbExtendedFromKnuckle && !isHoldingAFist) {
+    bestSign = 'O';
+    confidence = 95;
+    description = 'Semua ujung jari dan ibu jari bertemu melingkar membentuk huruf O';
+  } else if (
+    isCurvedFingers &&
+    isOpenCAperture &&
+    thumbExtendedFromKnuckle &&
+    isFingertipsArchedOut &&
+    !isHoldingAFist
+  ) {
+    bestSign = 'C';
+    confidence = 95;
+    description = 'Jemari dan ibu jari melengkung setengah lingkaran membentuk huruf C';
+  }
+
+  // -------------------------------------------------------------
+  // RULE 11: FIST DISAMBIGUATION: 'A' vs 'S' vs 'T' vs 'M' vs 'N' vs 'E'
+  // (Fingers 2-5 are curled into palm)
   // -------------------------------------------------------------
   else {
-    // Check curvature of fingers for 'C' and 'O'
-    const indexAngle = calcAngle(indexMcp, indexPip, indexTip);
-    const middleAngle = calcAngle(middleMcp, middlePip, middleTip);
-    const isCurvedShape = indexAngle < 155 && middleAngle < 155;
+    // Failsafe guard: If fingers are pointing upward towards the ceiling, this is an open hand / 'B'
+    const areFingersUpright =
+      indexTip.y < indexMcp.y &&
+      middleTip.y < middleMcp.y &&
+      (wrist.y - middleTip.y) / palmSize > 0.65;
 
-    // In 'O', all fingertips converge tightly to touch thumb tip forming a closed circle
-    const isOpenLoop = distThumbIndex < 0.32 && distThumbMiddle < 0.36;
-    const isHollowCenter = normDist(indexPip, thumbMcp) > 0.42;
+    // 11A. 'T': Thumb inserted between index and middle knuckles of a CLENCHED FIST
+    // Crucial: Fingers must be curled down into the palm, NOT pointing up!
+    const isFistCurled = indexTip.y >= indexPip.y - 0.05 && middleTip.y >= middlePip.y - 0.05;
+    const thumbBetweenIndexMiddle =
+      thumbTip.y < indexMcp.y + 0.04 &&
+      Math.min(indexMcp.x, middleMcp.x) - 0.02 <= thumbTip.x &&
+      thumbTip.x <= Math.max(indexMcp.x, middleMcp.x) + 0.02;
 
-    if (isOpenLoop && isHollowCenter && isCurvedShape) {
-      bestSign = 'O';
+    if (areFingersUpright) {
+      bestSign = 'B';
       confidence = 94;
-      description = 'Semua ujung jari dan ibu jari bertemu melingkar membentuk huruf O';
+      description = 'Empat jari rapat tegak lurus ke atas, ibu jari terlipat di telapak (B)';
+    } else if (thumbBetweenIndexMiddle && isFistCurled) {
+      bestSign = 'T';
+      confidence = 94;
+      description = 'Kepalan tangan dengan ibu jari menyembul di antara telunjuk dan tengah (T)';
     }
-    // In 'C', fingers are curved in an open arc with a substantial gap between thumb and fingertips
-    else if (isCurvedShape && distThumbIndex >= 0.35 && distThumbIndex <= 0.85) {
-      bestSign = 'C';
+    // 11B. 'A' vs 'BAGUS' (Fist with thumb upright along lateral side of index)
+    else if (thumb && thumbTip.y < indexMcp.y + 0.10) {
+      const thumbVeryHigh = (wrist.y - thumbTip.y) / palmSize > 1.18;
+      const thumbIsolated = normDist(thumbTip, indexPip) > 0.72 && normDist(thumbTip, indexMcp) > 0.72;
+      const thumbAngleWide = calcAngle(indexMcp, thumbMcp, thumbTip) > 38;
+
+      if (mode === 'words' && thumbVeryHigh && thumbIsolated && thumbAngleWide) {
+        bestSign = 'BAGUS';
+        confidence = 94;
+        description = 'Ibu jari terangkat tinggi tegak ke atas terpisah dari kepalan (Bagus / Baik)';
+        gestureType = 'word';
+      } else {
+        // Standard, robust SIBI 'A'
+        bestSign = 'A';
+        confidence = 96;
+        description = 'Empat jari terlipat mengepal, ibu jari tegak di samping telunjuk (A)';
+      }
+    }
+    // 11C. 'S': Thumb crossed in front across the knuckles of middle/ring
+    else if (normDist(thumbTip, middlePip) < 0.40 && thumbTip.y > indexMcp.y - 0.02) {
+      bestSign = 'S';
       confidence = 92;
-      description = 'Jemari dan ibu jari melengkung setengah lingkaran membentuk huruf C';
+      description = 'Semua jari mengepal rapat, ibu jari melintang di depan jari-jari (S)';
     }
-
-    // -------------------------------------------------------------
-    // RULE 11: FIST DISAMBIGUATION: 'A' vs 'S' vs 'T' vs 'M' vs 'N' vs 'E'
-    // (All fingers 2-5 are curled into palm)
-    // -------------------------------------------------------------
+    // 11D. 'M': Thumb tucked under 3 fingers (index, middle, ring)
+    else if (normDist(thumbTip, ringPip) < 0.35) {
+      bestSign = 'M';
+      confidence = 90;
+      description = 'Ibu jari diselipkan di bawah 3 jari (telunjuk, tengah, manis) (M)';
+    }
+    // 11E. 'N': Thumb tucked under 2 fingers (index, middle)
+    else if (normDist(thumbTip, middlePip) < 0.40 && thumbTip.x > indexTip.x) {
+      bestSign = 'N';
+      confidence = 90;
+      description = 'Ibu jari diselipkan di bawah 2 jari (telunjuk dan jari tengah) (N)';
+    }
+    // 11F. 'E': Fingers curled tightly down against palm, thumb tucked underneath
     else {
-      // 11A. 'T': Thumb inserted between index and middle knuckles
-      const thumbBetweenIndexMiddle =
-        thumbTip.y < indexMcp.y + 0.04 &&
-        Math.min(indexMcp.x, middleMcp.x) - 0.02 <= thumbTip.x &&
-        thumbTip.x <= Math.max(indexMcp.x, middleMcp.x) + 0.02;
-
-      if (thumbBetweenIndexMiddle) {
-        bestSign = 'T';
-        confidence = 93;
-        description = 'Kepalan tangan dengan ibu jari menyembul di antara telunjuk dan tengah (T)';
-      }
-      // 11B. 'A' vs 'BAGUS' (Fist with thumb upright along outer lateral side of index)
-      else if (thumb && thumbTip.y < indexMcp.y + 0.04) {
-        if (mode === 'words' && thumbTip.y < indexMcp.y - 0.08 && normDist(thumbTip, indexPip) > 0.45) {
-          bestSign = 'BAGUS';
-          confidence = 94;
-          description = 'Ibu jari tegak mantap ke atas (Bagus / Baik / Mantap)';
-          gestureType = 'word';
-        } else {
-          bestSign = 'A';
-          confidence = 94;
-          description = 'Empat jari terlipat mengepal, ibu jari tegak di samping telunjuk (A)';
-        }
-      }
-      // 11C. 'S': Thumb crossed in front across the knuckles of middle/ring
-      else if (normDist(thumbTip, middlePip) < 0.38 && thumbTip.y > indexMcp.y - 0.02) {
-        bestSign = 'S';
-        confidence = 92;
-        description = 'Semua jari mengepal rapat, ibu jari melintang di depan jari-jari (S)';
-      }
-      // 11D. 'M': Thumb tucked under 3 fingers (index, middle, ring)
-      else if (normDist(thumbTip, ringPip) < 0.35) {
-        bestSign = 'M';
-        confidence = 90;
-        description = 'Ibu jari diselipkan di bawah 3 jari (telunjuk, tengah, manis) (M)';
-      }
-      // 11E. 'N': Thumb tucked under 2 fingers (index, middle)
-      else if (normDist(thumbTip, middlePip) < 0.40 && thumbTip.x > indexTip.x) {
-        bestSign = 'N';
-        confidence = 90;
-        description = 'Ibu jari diselipkan di bawah 2 jari (telunjuk dan jari tengah) (N)';
-      }
-      // 11F. 'E': Fingers curled tightly down against palm, thumb tucked underneath
-      else {
-        bestSign = 'E';
-        confidence = 91;
-        description = 'Semua jari tertekuk rapat ke telapak tangan, ibu jari di bawahnya (E)';
-      }
+      bestSign = 'E';
+      confidence = 91;
+      description = 'Semua jari tertekuk rapat ke telapak tangan, ibu jari di bawahnya (E)';
     }
   }
 
@@ -463,4 +555,157 @@ export function classifySibiSign(
     motionTrail: globalMotionTracker.getActiveTrail(),
     motionEnergy: globalMotionTracker.getMotionEnergy()
   };
+}
+
+/**
+ * Classifies two-handed gestures such as 'Terima Kasih' (Kedua telapak tangan mengatup santun / salam di depan dada).
+ */
+export function classifyTwoHandSign(
+  hand1Landmarks: NormalizedLandmark[],
+  hand1Handedness: 'Left' | 'Right',
+  hand2Landmarks: NormalizedLandmark[],
+  hand2Handedness: 'Left' | 'Right',
+  mode: 'all' | 'alphabet' | 'words' = 'all'
+): HandGestureResult | null {
+  if (mode === 'alphabet') {
+    return null; // When strictly spelling alphabet, do not hijack with 2-hand words
+  }
+
+  if (!hand1Landmarks || hand1Landmarks.length < 21 || !hand2Landmarks || hand2Landmarks.length < 21) {
+    return null;
+  }
+
+  const wrist1 = hand1Landmarks[0];
+  const wrist2 = hand2Landmarks[0];
+  const middleMcp1 = hand1Landmarks[9];
+  const middleMcp2 = hand2Landmarks[9];
+  const middleTip1 = hand1Landmarks[12];
+  const middleTip2 = hand2Landmarks[12];
+  const indexTip1 = hand1Landmarks[8];
+  const indexTip2 = hand2Landmarks[8];
+
+  const palm1 = Math.max(0.01, calcDistance(wrist1, middleMcp1));
+  const palm2 = Math.max(0.01, calcDistance(wrist2, middleMcp2));
+  const avgPalm = (palm1 + palm2) / 2;
+
+  // Key distances between the two hands
+  const distWrists = calcDistance(wrist1, wrist2) / avgPalm;
+  const distPalms = calcDistance(middleMcp1, middleMcp2) / avgPalm;
+  const distMiddleTips = calcDistance(middleTip1, middleTip2) / avgPalm;
+
+  // Finger extensions on both hands
+  const states1 = evaluateFingerStates(hand1Landmarks);
+  const states2 = evaluateFingerStates(hand2Landmarks);
+
+  const fingersUp1 = middleTip1.y < wrist1.y && indexTip1.y < wrist1.y;
+  const fingersUp2 = middleTip2.y < wrist2.y && indexTip2.y < wrist2.y;
+
+  // 1. NAMA (Kedua tangan membentuk huruf H saling menyilang / mengetuk)
+  const isH1 = states1.index && states1.middle && !states1.ring && !states1.pinky;
+  const isH2 = states2.index && states2.middle && !states2.ring && !states2.pinky;
+  const areHTipsClose = distMiddleTips < 2.4 || calcDistance(middleTip1, middleTip2) < 0.36;
+
+  if (isH1 && isH2 && areHTipsClose) {
+    return {
+      letter: 'Nama',
+      confidence: 96,
+      label: 'SIBI Nama (2 Tangan)',
+      fingerStates: states1,
+      description: 'Kedua tangan membentuk huruf H saling menyilang mengetuk di depan dada (Nama)',
+      handedness: 'Right',
+      gestureType: 'word',
+      isTwoHanded: true,
+      twoHandsDetected: true,
+      requiresVerification: true,
+      verificationWindowMs: 400
+    };
+  }
+
+  // 2. TOLONG (Satu telapak tangan bertumpuk di atas telapak lainnya saling menopang)
+  const isVerticalStacked = Math.abs(wrist1.y - wrist2.y) > 0.06 && Math.abs(wrist1.y - wrist2.y) < 0.34;
+  const areStackedPalmsClose = distPalms < 2.0 || calcDistance(middleMcp1, middleMcp2) < 0.28;
+  const isStackOpen = (states1.index || states1.middle) && (states2.index || states2.middle);
+
+  if (isVerticalStacked && areStackedPalmsClose && isStackOpen) {
+    return {
+      letter: 'Tolong',
+      confidence: 95,
+      label: 'SIBI Tolong (2 Tangan)',
+      fingerStates: states1,
+      description: 'Satu tangan bertumpuk di atas tangan lainnya saling menopang (Tolong)',
+      handedness: 'Right',
+      gestureType: 'word',
+      isTwoHanded: true,
+      twoHandsDetected: true,
+      requiresVerification: true,
+      verificationWindowMs: 420
+    };
+  }
+
+  // 3. TERIMA KASIH (Dua telapak tangan santun mengatup / merapat di depan dada - Salam / Terima Kasih)
+  const arePalmsClose = distPalms < 2.2 || calcDistance(middleMcp1, middleMcp2) < 0.32;
+  const areWristsClose = distWrists < 2.6 || calcDistance(wrist1, wrist2) < 0.36;
+  const areFingertipsClose = distMiddleTips < 2.2 || calcDistance(middleTip1, middleTip2) < 0.32;
+
+  const hasOpenFingers1 = states1.index && states1.middle;
+  const hasOpenFingers2 = states2.index && states2.middle;
+
+  if (arePalmsClose && areWristsClose && fingersUp1 && fingersUp2 && (hasOpenFingers1 || hasOpenFingers2)) {
+    return {
+      letter: 'Terima Kasih',
+      confidence: 97,
+      label: 'SIBI Terima Kasih (2 Tangan Mengatup)',
+      fingerStates: states1,
+      description: 'Kedua telapak tangan santun mengatup di depan dada (Salam / Terima Kasih)',
+      handedness: 'Right',
+      gestureType: 'greeting',
+      isTwoHanded: true,
+      twoHandsDetected: true,
+      requiresVerification: true,
+      verificationWindowMs: 400
+    };
+  }
+
+  // 4. SAMA-SAMA vs TERIMA KASIH TERBUKA
+  // Kedua tangan terbuka sejajar setinggi dada
+  const areHandsParallel = Math.abs(wrist1.y - wrist2.y) < 0.22;
+  const bothHandsOpen =
+    states1.index && states1.middle && (states1.ring || states1.pinky) &&
+    states2.index && states2.middle && (states2.ring || states2.pinky);
+
+  if (areHandsParallel && bothHandsOpen && fingersUp1 && fingersUp2) {
+    // If hands are held open separated comfortably at chest height -> Sama-sama
+    if (distPalms > 1.6 && distPalms < 4.2) {
+      return {
+        letter: 'Sama-sama',
+        confidence: 94,
+        label: 'SIBI Sama-sama (2 Tangan Terbuka)',
+        fingerStates: states1,
+        description: 'Kedua telapak tangan terbuka santun setinggi dada (Sama-sama)',
+        handedness: 'Right',
+        gestureType: 'greeting',
+        isTwoHanded: true,
+        twoHandsDetected: true,
+        requiresVerification: true,
+        verificationWindowMs: 420
+      };
+    }
+
+    // If hands are close together giving gratitude
+    return {
+      letter: 'Terima Kasih',
+      confidence: 94,
+      label: 'SIBI Terima Kasih (2 Tangan)',
+      fingerStates: states1,
+      description: 'Kedua telapak tangan terbuka sejajar memberi penghormatan (Terima Kasih)',
+      handedness: 'Right',
+      gestureType: 'greeting',
+      isTwoHanded: true,
+      twoHandsDetected: true,
+      requiresVerification: true,
+      verificationWindowMs: 420
+    };
+  }
+
+  return null;
 }

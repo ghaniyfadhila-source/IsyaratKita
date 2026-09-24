@@ -19,13 +19,15 @@ import {
   Zap,
   CheckCircle2,
   X,
-  Bot
+  Bot,
+  Clock,
+  Timer
 } from 'lucide-react';
 import { SIBI_ALPHABET, SIBI_COMMON_WORDS } from '../data/sibiData';
 import { HandSignIllustration } from './HandSignIllustration';
-import { FingerStates, GeminiAnalysisResult, NormalizedLandmark } from '../types';
-import { getHandLandmarker, drawHandLandmarks } from '../utils/mediaPipeService';
-import { classifySibiSign, DetectionFilterMode } from '../utils/sibiGestureClassifier';
+import { FingerStates, GeminiAnalysisResult, NormalizedLandmark, HandGestureResult } from '../types';
+import { getHandLandmarker, drawHandLandmarks, drawMultipleHands, HandDrawItem } from '../utils/mediaPipeService';
+import { classifySibiSign, classifyTwoHandSign, DetectionFilterMode } from '../utils/sibiGestureClassifier';
 import { globalMotionTracker } from '../utils/motionTracker';
 
 interface SignToSpeechViewProps {
@@ -43,6 +45,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
   const [isModelLoading, setIsModelLoading] = useState<boolean>(false);
   const [isModelReady, setIsModelReady] = useState<boolean>(false);
   const [handDetected, setHandDetected] = useState<boolean>(false);
+  const [detectedHandCount, setDetectedHandCount] = useState<number>(0);
 
   // Detection Results
   const [detectedLetter, setDetectedLetter] = useState<string>('A');
@@ -66,6 +69,14 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
   const [detectionFilterMode, setDetectionFilterMode] = useState<DetectionFilterMode>('all');
   const detectionFilterModeRef = useRef<DetectionFilterMode>('all');
   detectionFilterModeRef.current = detectionFilterMode;
+
+  // AI Reading Pause & Stabilization Settings
+  // 'cepat' (750ms), 'akurat' (1150ms - default), 'teliti' (1600ms)
+  const [aiReadingPause, setAiReadingPause] = useState<'cepat' | 'akurat' | 'teliti'>('akurat');
+  const aiReadingPauseRef = useRef<'cepat' | 'akurat' | 'teliti'>('akurat');
+  aiReadingPauseRef.current = aiReadingPause;
+  const [readingStatus, setReadingStatus] = useState<string>('Siap');
+  const [isStabilizing, setIsStabilizing] = useState<boolean>(false);
 
   // Settings & Toggles
   const [showSkeleton, setShowSkeleton] = useState<boolean>(true);
@@ -96,6 +107,24 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
   const committedCooldownRef = useRef<boolean>(false);
   const frameCountRef = useRef<number>(0);
   const lastFpsUpdateRef = useRef<number>(performance.now());
+
+  // Temporal rolling prediction window (for smoothing & anti-flicker voting)
+  interface RecentPrediction {
+    letter: string;
+    confidence: number;
+    time: number;
+  }
+  const recentPredictionsRef = useRef<RecentPrediction[]>([]);
+
+  // Dynamic gesture verification pause ref
+  interface DynamicVerificationState {
+    candidate: string;
+    label: string;
+    startTime: number;
+    durationMs: number;
+    targetWord: string;
+  }
+  const dynamicVerificationRef = useRef<DynamicVerificationState | null>(null);
 
   // Web Audio Synthetic Feedback Beep
   const playCommitChirp = useCallback(() => {
@@ -131,37 +160,54 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
     globalMotionTracker.setSensitivity(mult);
   }, [dynamicSensitivity]);
 
-  // Handle auto-commit logic
+  // Handle auto-commit logic with configurable AI reading pause & stabilization
   const handleAutoCommitCheck = useCallback(
     (letter: string, confidence: number, isDynamic: boolean = false) => {
-      if (!autoCommit || !letter || letter === '?' || confidence < 78) {
+      if (!autoCommit || !letter || letter === '?' || confidence < 76) {
         setHoldProgress(0);
         holdStartTimeRef.current = 0;
+        setReadingStatus('Menunggu...');
         return;
       }
 
       const now = performance.now();
-      // Dynamic gestures have already executed a movement sequence, so they commit faster (300ms)
-      const HOLD_DURATION_MS = isDynamic ? 300 : 750;
+      // Calculate target hold duration based on user preference
+      const targetHoldDuration = isDynamic
+        ? 450
+        : aiReadingPauseRef.current === 'cepat'
+        ? 750
+        : aiReadingPauseRef.current === 'teliti'
+        ? 1600
+        : 1150; // default 1150ms
 
       if (letter !== lastCandidateRef.current) {
         lastCandidateRef.current = letter;
         holdStartTimeRef.current = now;
         committedCooldownRef.current = false;
         setHoldProgress(0);
+        setReadingStatus('Membaca gestur...');
         return;
       }
 
       if (committedCooldownRef.current) {
         setHoldProgress(100);
+        setReadingStatus('Sudah Ditambahkan');
         return;
       }
 
       const elapsed = now - holdStartTimeRef.current;
-      const progress = Math.min(100, (elapsed / HOLD_DURATION_MS) * 100);
+      const progress = Math.min(100, (elapsed / targetHoldDuration) * 100);
       setHoldProgress(progress);
 
-      if (elapsed >= HOLD_DURATION_MS && !committedCooldownRef.current) {
+      if (progress < 30) {
+        setReadingStatus('Membaca...');
+      } else if (progress < 80) {
+        setReadingStatus(`Memvalidasi SIBI ${letter}`);
+      } else {
+        setReadingStatus('Hampir selesai...');
+      }
+
+      if (elapsed >= targetHoldDuration && !committedCooldownRef.current) {
         committedCooldownRef.current = true;
         setWordBuffer((prev) => {
           if (letter.length > 1) {
@@ -174,9 +220,14 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
           }
         });
         playCommitChirp();
+        setReadingStatus(`✅ SIBI ${letter} Terbaca!`);
+        setDynamicToast(`✅ SIBI ${letter} Berhasil Ditambahkan`);
+        setTimeout(() => {
+          setDynamicToast(null);
+        }, 1200);
         setTimeout(() => {
           setHoldProgress(0);
-        }, 300);
+        }, 350);
       }
     },
     [autoCommit, playCommitChirp]
@@ -219,68 +270,225 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
 
       if (results && results.landmarks && results.landmarks.length > 0) {
         setHandDetected(true);
-        const rawLandmarks = results.landmarks[0] as NormalizedLandmark[];
-        const handedness =
-          results.handedness && results.handedness[0] && results.handedness[0][0]?.categoryName === 'Left'
-            ? 'Left'
-            : 'Right';
+        const handCount = results.landmarks.length;
+        setDetectedHandCount(handCount);
 
-        // Classify SIBI Gesture with static + dynamic trajectory analysis
-        const classification = classifySibiSign(rawLandmarks, handedness, detectionFilterModeRef.current);
+        const handItems: HandDrawItem[] = [];
+        let classification: HandGestureResult;
 
-        setDetectedLetter(classification.letter);
-        setDetectionConfidence(classification.confidence);
-        setGestureDescription(classification.description || '');
-        setFingerStates(classification.fingerStates);
-        setIsDynamicGesture(!!classification.isDynamic);
-        setGestureType(classification.gestureType || 'letter');
-        setMotionEnergy(classification.motionEnergy || 0);
+        // MULTI-HAND DETECTION: Support 2 Hands (e.g. Terima Kasih / Salam)
+        if (handCount >= 2) {
+          const rawLandmarks0 = results.landmarks[0] as NormalizedLandmark[];
+          const rawLandmarks1 = results.landmarks[1] as NormalizedLandmark[];
+          const handedness0 =
+            results.handedness && results.handedness[0] && results.handedness[0][0]?.categoryName === 'Left'
+              ? 'Left'
+              : 'Right';
+          const handedness1 =
+            results.handedness && results.handedness[1] && results.handedness[1][0]?.categoryName === 'Left'
+              ? 'Left'
+              : 'Right';
 
-        // Process Dynamic Immediate Commit or Static Hold Auto-commit
-        if (autoCommit && classification.immediateCommit) {
-          setWordBuffer((prev) => {
-            const letter = classification.letter;
-            if (letter.length > 1) {
-              const trimmed = prev.trim();
-              return trimmed.length > 0 ? `${trimmed} ${letter} ` : `${letter} `;
-            } else {
-              return prev + letter;
-            }
-          });
-          playCommitChirp();
-          setHoldProgress(100);
-          setDynamicToast(`Gerakan ${classification.letter} Dikenali!`);
-          setTimeout(() => {
-            setHoldProgress(0);
-            setDynamicToast(null);
-          }, 1400);
+          // First check for 2-handed gesture (like Terima Kasih)
+          const twoHandSign = classifyTwoHandSign(
+            rawLandmarks0,
+            handedness0,
+            rawLandmarks1,
+            handedness1,
+            detectionFilterModeRef.current
+          );
+
+          if (twoHandSign) {
+            classification = twoHandSign;
+            handItems.push({
+              landmarks: rawLandmarks0,
+              label: 'Terima Kasih',
+              confidence: twoHandSign.confidence,
+              handedness: handedness0
+            });
+            handItems.push({
+              landmarks: rawLandmarks1,
+              label: 'Terima Kasih',
+              confidence: twoHandSign.confidence,
+              handedness: handedness1
+            });
+          } else {
+            // Not a two-hand specific gesture, classify individual hands and pick the primary/dominant
+            const class0 = classifySibiSign(rawLandmarks0, handedness0, detectionFilterModeRef.current);
+            const class1 = classifySibiSign(rawLandmarks1, handedness1, detectionFilterModeRef.current);
+
+            // Select hand with higher confidence
+            classification = class1.confidence > class0.confidence ? class1 : class0;
+
+            handItems.push({
+              landmarks: rawLandmarks0,
+              label: class0.letter,
+              confidence: class0.confidence,
+              handedness: handedness0,
+              trail: class0.motionTrail,
+              isDynamic: class0.isDynamic
+            });
+            handItems.push({
+              landmarks: rawLandmarks1,
+              label: class1.letter,
+              confidence: class1.confidence,
+              handedness: handedness1,
+              trail: class1.motionTrail,
+              isDynamic: class1.isDynamic
+            });
+          }
         } else {
-          handleAutoCommitCheck(classification.letter, classification.confidence, !!classification.isDynamic);
+          // SINGLE-HAND DETECTION (1 hand in frame)
+          const rawLandmarks = results.landmarks[0] as NormalizedLandmark[];
+          const handedness =
+            results.handedness && results.handedness[0] && results.handedness[0][0]?.categoryName === 'Left'
+              ? 'Left'
+              : 'Right';
+
+          classification = classifySibiSign(rawLandmarks, handedness, detectionFilterModeRef.current);
+
+          handItems.push({
+            landmarks: rawLandmarks,
+            label: classification.letter,
+            confidence: classification.confidence,
+            handedness,
+            trail: classification.motionTrail,
+            isDynamic: classification.isDynamic
+          });
         }
 
-        // Render Landmark Skeleton on Canvas
+        // Case 1: DYNAMIC GESTURE (with Verification / Reading Pause)
+        if (classification.isDynamic) {
+          setIsDynamicGesture(true);
+          setDetectedLetter(classification.letter);
+          setDetectionConfidence(classification.confidence);
+          setGestureDescription(classification.description || '');
+          setFingerStates(classification.fingerStates);
+          setGestureType(classification.gestureType || 'word');
+          setMotionEnergy(classification.motionEnergy || 0);
+          setIsStabilizing(false);
+
+          if (autoCommit) {
+            // If verification state not initialized yet, start verification window
+            if (!dynamicVerificationRef.current || dynamicVerificationRef.current.candidate !== classification.letter) {
+              dynamicVerificationRef.current = {
+                candidate: classification.letter,
+                label: classification.label,
+                startTime: startTimeMs,
+                durationMs: classification.verificationWindowMs || 480,
+                targetWord: classification.letter
+              };
+              setDynamicToast(`⏳ AI Membaca Gerakan ${classification.letter}... Selesaikan gerakan`);
+            }
+
+            const activeVerif = dynamicVerificationRef.current;
+            const elapsed = startTimeMs - activeVerif.startTime;
+            const dProgress = Math.min(100, (elapsed / activeVerif.durationMs) * 100);
+            setHoldProgress(dProgress);
+            setReadingStatus(`Membaca Gerak ${activeVerif.targetWord}`);
+
+            if (elapsed >= activeVerif.durationMs && !committedCooldownRef.current) {
+              committedCooldownRef.current = true;
+              const verifiedWord = activeVerif.targetWord;
+              dynamicVerificationRef.current = null;
+
+              setWordBuffer((prev) => {
+                if (verifiedWord.length > 1) {
+                  const trimmed = prev.trim();
+                  return trimmed.length > 0 ? `${trimmed} ${verifiedWord} ` : `${verifiedWord} `;
+                } else {
+                  return prev + verifiedWord;
+                }
+              });
+              playCommitChirp();
+              setHoldProgress(100);
+              setReadingStatus(`✅ Gerakan ${verifiedWord} Terverifikasi!`);
+              setDynamicToast(`✨ Gerakan SIBI ${verifiedWord} Terbaca Akurat!`);
+              setTimeout(() => {
+                setHoldProgress(0);
+                setDynamicToast(null);
+                committedCooldownRef.current = false;
+              }, 1400);
+            }
+          }
+        } else {
+          // Case 2: STATIC ALPHABET / WORD / TWO-HAND (with Temporal Smoothing & Jeda Baca AI)
+          setIsDynamicGesture(false);
+          dynamicVerificationRef.current = null;
+
+          recentPredictionsRef.current.push({
+            letter: classification.letter,
+            confidence: classification.confidence,
+            time: startTimeMs
+          });
+
+          // Retain only recent 260ms / max 8 frames
+          while (
+            recentPredictionsRef.current.length > 8 ||
+            (recentPredictionsRef.current.length > 0 &&
+              startTimeMs - recentPredictionsRef.current[0].time > 260)
+          ) {
+            recentPredictionsRef.current.shift();
+          }
+
+          // Compute frequency tally
+          const frequencies: Record<string, number> = {};
+          for (const item of recentPredictionsRef.current) {
+            frequencies[item.letter] = (frequencies[item.letter] || 0) + 1;
+          }
+
+          let dominantLetter = classification.letter;
+          let maxCount = 0;
+          for (const [key, count] of Object.entries(frequencies)) {
+            if (count > maxCount) {
+              maxCount = count;
+              dominantLetter = key;
+            }
+          }
+
+          const totalWindow = recentPredictionsRef.current.length;
+          // Require at least 50% majority in the recent window for stability
+          const isPoseStable = totalWindow <= 2 || maxCount / totalWindow >= 0.50;
+
+          setIsStabilizing(!isPoseStable);
+
+          if (isPoseStable) {
+            setDetectedLetter(dominantLetter);
+            setDetectionConfidence(classification.confidence);
+            setGestureDescription(classification.description || '');
+            setFingerStates(classification.fingerStates);
+            setGestureType(classification.gestureType || 'letter');
+            setMotionEnergy(classification.motionEnergy || 0);
+
+            handleAutoCommitCheck(dominantLetter, classification.confidence, false);
+          } else {
+            // Hand is currently shifting or transitioning
+            setMotionEnergy(classification.motionEnergy || 0);
+            setReadingStatus('Menstabilkan gestur...');
+          }
+        }
+
+        // Render Landmark Skeleton on Canvas (Supports 1 or 2 hands)
         if (showSkeleton) {
-          drawHandLandmarks(
-            ctx,
-            rawLandmarks,
-            canvas.width,
-            canvas.height,
-            true, // Mirrored user camera
-            classification.letter,
-            classification.confidence,
-            classification.motionTrail,
-            classification.isDynamic
-          );
+          const banner = classification.isTwoHanded
+            ? `🤲 ${classification.label} (${classification.confidence}%)`
+            : undefined;
+          drawMultipleHands(ctx, handItems, canvas.width, canvas.height, true, banner);
         } else {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
       } else {
         // No hand in frame
         setHandDetected(false);
+        setDetectedHandCount(0);
         setHoldProgress(0);
         setMotionEnergy(0);
+        setIsStabilizing(false);
+        setReadingStatus('Siap');
         lastCandidateRef.current = '';
         committedCooldownRef.current = false;
+        dynamicVerificationRef.current = null;
+        recentPredictionsRef.current = [];
         globalMotionTracker.reset();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
@@ -510,17 +718,17 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
   return (
     <div id="sign-to-speech-section" className="space-y-6 max-w-5xl mx-auto">
       {/* Header Info */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="liquid-glass rounded-3xl p-5 border border-slate-200/90 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-800">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
               Kamera Isyarat
             </span>
-            <h2 className="text-lg font-bold text-slate-900">
+            <h2 className="text-lg font-bold text-slate-800">
               Terjemahkan Isyarat Tangan ke Suara &amp; Tulisan
             </h2>
           </div>
-          <p className="text-sm text-slate-600 mt-1">
+          <p className="text-xs sm:text-sm text-slate-600 mt-1">
             Arahkan tangan ke kamera untuk memperagakan isyarat SIBI. Aplikasi akan membaca gerakan tangan Anda, merangkainya menjadi kata, dan membacakannya bersuara.
           </p>
         </div>
@@ -531,10 +739,10 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
             id="btn-toggle-camera"
             onClick={handleToggleCamera}
             disabled={isModelLoading}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs ${
+            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-98 ${
               cameraActive
                 ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                : 'bg-teal-600 hover:bg-teal-700 text-white'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
             }`}
           >
             {isModelLoading ? (
@@ -558,9 +766,9 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
       </div>
 
       {/* Mode Pengenalan Isyarat Selector */}
-      <div className="bg-white rounded-2xl p-3 px-4 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="liquid-glass rounded-2xl p-3 px-4 border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Sliders className="w-4 h-4 text-teal-600 shrink-0" />
+          <Sliders className="w-4 h-4 text-blue-600 shrink-0" />
           <span className="text-xs font-bold text-slate-800">Target Deteksi:</span>
           <span className="text-xs text-slate-500 hidden md:inline">
             {detectionFilterMode === 'alphabet'
@@ -571,12 +779,12 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 self-stretch sm:self-auto justify-center">
+        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/80 self-stretch sm:self-auto justify-center">
           <button
             onClick={() => setDetectionFilterMode('alphabet')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
               detectionFilterMode === 'alphabet'
-                ? 'bg-white text-teal-800 shadow-xs border border-teal-200'
+                ? 'bg-white text-blue-700 shadow-2xs border border-slate-200'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
             title="Kunci Alfabet A-Z murni tanpa gangguan kata dinamis"
@@ -588,7 +796,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
             onClick={() => setDetectionFilterMode('all')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
               detectionFilterMode === 'all'
-                ? 'bg-white text-teal-800 shadow-xs border border-teal-200'
+                ? 'bg-white text-blue-700 shadow-2xs border border-slate-200'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
             title="Deteksi seimbang antara huruf statis dan gerakan dinamis aktif"
@@ -600,7 +808,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
             onClick={() => setDetectionFilterMode('words')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
               detectionFilterMode === 'words'
-                ? 'bg-white text-teal-800 shadow-xs border border-teal-200'
+                ? 'bg-white text-blue-700 shadow-2xs border border-slate-200'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
             title="Prioritaskan kata-kata cepat dan sapaan (Halo, Terima Kasih, Ya, Tidak, Bagus)"
@@ -700,7 +908,11 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                           handDetected ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'
                         }`}
                       />
-                      {handDetected ? 'Tangan Terbaca Jelas' : 'Arahkan Tangan ke Kamera...'}
+                      {handDetected
+                        ? detectedHandCount >= 2
+                          ? '2 Tangan Terdeteksi (Kiri & Kanan)'
+                          : '1 Tangan Terbaca Jelas'
+                        : 'Arahkan Tangan ke Kamera...'}
                     </span>
 
                     <span className="text-xs text-white/80 bg-black/60 px-2.5 py-1 rounded-full font-mono backdrop-blur-xs border border-white/10 hidden sm:inline">
@@ -719,18 +931,34 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                       <span>IsyaratKita &bull; Ghaniy Fadhila</span>
                     </span>
 
-                    {/* Hold to Auto-commit Indicator */}
+                    {/* Hold to Auto-commit Indicator with Jeda Baca AI State */}
                     {autoCommit && handDetected && (
-                      <div className="flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-teal-500/40">
-                        <Zap className="w-3.5 h-3.5 text-teal-400 animate-pulse" />
-                        <span className="text-[11px] font-mono text-teal-200 font-bold">
-                          Menahan: {Math.round(holdProgress)}%
-                        </span>
-                        <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            className="bg-teal-400 h-full transition-all duration-75"
-                            style={{ width: `${holdProgress}%` }}
-                          />
+                      <div className="flex items-center gap-2 bg-black/75 backdrop-blur-md px-3 py-1 rounded-full border border-teal-500/40 shadow-xs">
+                        <Zap
+                          className={`w-3.5 h-3.5 ${
+                            isStabilizing ? 'text-amber-400' : 'text-teal-400'
+                          } animate-pulse`}
+                        />
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-mono text-teal-200 font-bold whitespace-nowrap">
+                              {isStabilizing
+                                ? 'Menstabilkan...'
+                                : `${readingStatus} (${Math.round(holdProgress)}%)`}
+                            </span>
+                          </div>
+                          <div className="w-20 h-1.5 bg-slate-700/80 rounded-full overflow-hidden mt-0.5">
+                            <div
+                              className={`h-full transition-all duration-75 ${
+                                isStabilizing
+                                  ? 'bg-amber-400'
+                                  : holdProgress >= 90
+                                  ? 'bg-emerald-400'
+                                  : 'bg-teal-400'
+                              }`}
+                              style={{ width: `${holdProgress}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
                     )}
@@ -766,7 +994,12 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                             ⚡ Gerakan Mengayun
                           </span>
                         )}
-                        {gestureType === 'word' && !isDynamicGesture && (
+                        {['Terima Kasih', 'Sama-sama', 'Tolong', 'Nama'].includes(detectedLetter) && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-400 text-slate-950">
+                            🤲 2 Tangan ({detectedLetter})
+                          </span>
+                        )}
+                        {gestureType === 'word' && !isDynamicGesture && !['Terima Kasih', 'Sama-sama', 'Tolong', 'Nama'].includes(detectedLetter) && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950">
                             Kata Utuh
                           </span>
@@ -806,23 +1039,23 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
           </div>
 
           {/* Real-time Finger State Diagnostics & Vision Controls */}
-          <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-3">
+          <div className="liquid-glass rounded-3xl p-4 border border-slate-200/90 shadow-sm space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-teal-600" />
+                <Activity className="w-4 h-4 text-blue-600" />
                 <span className="text-xs font-bold text-slate-800">
                   Status Posisi Jari
                 </span>
               </div>
 
-              <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-2 text-xs">
                 {/* Skeleton Toggle */}
                 <button
                   onClick={() => setShowSkeleton(!showSkeleton)}
                   className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border transition-colors ${
                     showSkeleton
-                      ? 'bg-teal-50 text-teal-700 border-teal-300 font-semibold'
-                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                      ? 'bg-blue-50 text-blue-700 border-blue-200 font-semibold'
+                      : 'bg-white text-slate-600 border-slate-200'
                   }`}
                   title="Tampilkan garis panduan tangan"
                 >
@@ -835,8 +1068,8 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                   onClick={() => setAutoCommit(!autoCommit)}
                   className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border transition-colors ${
                     autoCommit
-                      ? 'bg-teal-50 text-teal-700 border-teal-300 font-semibold'
-                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                      ? 'bg-blue-50 text-blue-700 border-blue-200 font-semibold'
+                      : 'bg-white text-slate-600 border-slate-200'
                   }`}
                   title="Ketik otomatis saat gerakan tangan ditahan sejenak"
                 >
@@ -900,6 +1133,39 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
               </div>
             </div>
 
+            {/* Jeda Baca AI / Accuracy Hold Delay Setting */}
+            <div className="pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+              <div>
+                <span className="font-bold text-slate-800 text-[11px] flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-teal-600" />
+                  Jeda Baca AI (Stabilisasi):
+                </span>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Waktu jeda AI membaca &amp; memvalidasi gestur agar terjemahan tepat dan tidak salah ketik.
+                </p>
+              </div>
+
+              <div className="inline-flex bg-slate-100 p-0.5 rounded-xl text-[11px] font-semibold shrink-0 self-start sm:self-auto">
+                {[
+                  { key: 'cepat', label: 'Cepat (0.8s)', desc: 'Pengguna mahir' },
+                  { key: 'akurat', label: 'Akurat (1.1s ⭐)', desc: 'Stabil & akurat' },
+                  { key: 'teliti', label: 'Teliti (1.6s)', desc: 'Ekstra tenang belajar' }
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setAiReadingPause(key as 'cepat' | 'akurat' | 'teliti')}
+                    className={`px-2.5 py-1 rounded-lg transition-all ${
+                      aiReadingPause === key
+                        ? 'bg-white text-teal-800 shadow-2xs font-bold'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Real-time Motion Energy Bar & Dynamic Sensitivity Controls */}
             <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 flex-1">
@@ -918,7 +1184,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
               </div>
 
               <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                <span className="text-[11px] text-slate-500 font-medium">Kecepatan Respons:</span>
+                <span className="text-[11px] text-slate-500 font-medium">Sensitivitas Gerak:</span>
                 <div className="inline-flex bg-slate-100 p-0.5 rounded-lg text-[11px] font-semibold">
                   {[
                     { key: 'normal', label: 'Santai' },
@@ -943,10 +1209,10 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
           </div>
 
           {/* SIBI Quick Letter & Word Simulator */}
-          <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-3">
+          <div className="liquid-glass rounded-3xl p-4 border border-slate-200/90 shadow-sm space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-teal-600" />
+                <Sparkles className="w-4 h-4 text-blue-600" />
                 <span className="text-xs font-bold text-slate-800">
                   Papan Ketik Isyarat Cepat
                 </span>
@@ -958,7 +1224,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                   onClick={() => setActiveSimTab('huruf')}
                   className={`px-3 py-1 rounded-lg transition-all ${
                     activeSimTab === 'huruf'
-                      ? 'bg-white text-teal-700 shadow-2xs font-bold'
+                      ? 'bg-white text-blue-700 shadow-2xs font-bold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -968,7 +1234,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                   onClick={() => setActiveSimTab('kata')}
                   className={`px-3 py-1 rounded-lg transition-all ${
                     activeSimTab === 'kata'
-                      ? 'bg-white text-teal-700 shadow-2xs font-bold'
+                      ? 'bg-white text-blue-700 shadow-2xs font-bold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -983,7 +1249,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                   <button
                     key={sign.id}
                     onClick={() => handleAddLetter(sign.label)}
-                    className="h-9 rounded-xl font-mono font-bold text-xs bg-slate-50 hover:bg-teal-600 hover:text-white border border-slate-200 transition-all flex items-center justify-center active:scale-95 shadow-2xs"
+                    className="h-9 rounded-xl font-mono font-bold text-xs bg-white/80 hover:bg-blue-600 hover:text-white border border-slate-200/80 transition-all flex items-center justify-center active:scale-95 shadow-2xs text-slate-800"
                     title={`Isyarat Huruf ${sign.label}: ${sign.description}`}
                   >
                     {sign.label}
@@ -1009,10 +1275,10 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                   <button
                     key={item.label}
                     onClick={() => handleAddLetter(item.label)}
-                    className="p-2.5 rounded-xl text-left bg-slate-50 hover:bg-teal-50 hover:border-teal-300 border border-slate-200 transition-all group active:scale-98 shadow-2xs"
+                    className="p-2.5 rounded-xl text-left bg-white/80 hover:bg-white hover:border-blue-300 border border-slate-200/80 transition-all group active:scale-98 shadow-2xs"
                     title={item.desc}
                   >
-                    <span className="block text-xs font-bold text-slate-800 group-hover:text-teal-700">
+                    <span className="block text-xs font-bold text-slate-800 group-hover:text-blue-600">
                       {item.label}
                     </span>
                     <span className="block text-[10px] text-slate-500 truncate mt-0.5">
@@ -1027,38 +1293,38 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
 
         {/* Right Column: Translated Speech & Text Output Panel */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-4">
+          <div className="liquid-glass rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <span className="text-sm font-bold text-slate-800">
                 Hasil Terjemahan
               </span>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                 Suara Langsung
               </span>
             </div>
 
             {/* Active Character Preview Card */}
-            <div className="bg-gradient-to-r from-teal-50/80 to-slate-50 rounded-2xl p-3.5 border border-teal-100 flex items-center justify-between">
+            <div className="bg-white/90 rounded-2xl p-3.5 border border-slate-200/90 flex items-center justify-between shadow-2xs">
               <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-2xl bg-white border border-teal-200 flex items-center justify-center shadow-xs overflow-hidden">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-xs overflow-hidden">
                   <HandSignIllustration signId={detectedLetter.toLowerCase()} size={48} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono font-black text-2xl text-teal-900">
+                    <span className="font-mono font-black text-2xl text-slate-900">
                       {detectedLetter || '-'}
                     </span>
                     {isDynamicGesture ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 uppercase tracking-wider">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 uppercase tracking-wider">
                         Gerakan Mengayun
                       </span>
                     ) : (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 uppercase tracking-wider">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider">
                         Terbaca
                       </span>
                     )}
                   </div>
-                  <span className="text-xs text-slate-600 block">
+                  <span className="text-xs text-slate-500 block">
                     Kecocokan: {detectionConfidence}%
                   </span>
                 </div>
@@ -1066,7 +1332,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
 
               <button
                 onClick={() => handleAddLetter(detectedLetter)}
-                className="px-3.5 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition-colors shadow-xs active:scale-95"
+                className="px-3.5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors shadow-xs active:scale-95"
                 title="Ketik huruf ini ke dalam kalimat"
               >
                 + Tambah Huruf
@@ -1079,10 +1345,10 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                 Kalimat yang Dirangkai:
               </label>
 
-              <div className="min-h-[110px] p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 font-medium text-base sm:text-lg flex flex-wrap items-baseline gap-1.5 break-words">
+              <div className="min-h-[110px] p-4 rounded-2xl bg-white/80 border border-slate-200/80 text-slate-800 font-medium text-base sm:text-lg flex flex-wrap items-baseline gap-1.5 break-words shadow-2xs">
                 {sentenceBuffer && <span>{sentenceBuffer}</span>}
                 {wordBuffer && (
-                  <span className="text-teal-700 font-bold underline decoration-teal-400 decoration-2 underline-offset-4">
+                  <span className="text-blue-600 font-bold underline decoration-blue-400 decoration-2 underline-offset-4">
                     {wordBuffer}
                   </span>
                 )}
@@ -1099,7 +1365,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
               <button
                 id="btn-buffer-backspace"
                 onClick={handleBackspace}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors active:scale-95"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 transition-colors active:scale-95 shadow-2xs"
               >
                 <Delete className="w-3.5 h-3.5" />
                 <span>Hapus Huruf</span>
@@ -1107,7 +1373,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
               <button
                 id="btn-buffer-space"
                 onClick={handleAddSpace}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors active:scale-95"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 transition-colors active:scale-95 shadow-2xs"
               >
                 <Space className="w-3.5 h-3.5" />
                 <span>Beri Spasi</span>
@@ -1128,7 +1394,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                 id="btn-speak-sign-result"
                 onClick={() => speakText(fullDisplayResult)}
                 disabled={!fullDisplayResult}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-40 transition-all shadow-xs active:scale-95"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 transition-all shadow-xs active:scale-95"
               >
                 <Volume2 className="w-4 h-4" />
                 <span>Bunyikan Suara Kalimat</span>
@@ -1138,13 +1404,13 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                 id="btn-copy-sign-result"
                 onClick={handleCopy}
                 disabled={!fullDisplayResult}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-40 transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 disabled:opacity-40 transition-colors shadow-2xs"
                 title="Salin tulisan ini"
               >
                 {copied ? (
                   <>
                     <Check className="w-4 h-4 text-emerald-600" />
-                    <span className="text-emerald-700">Tersalin</span>
+                    <span className="text-emerald-700 font-bold">Tersalin</span>
                   </>
                 ) : (
                   <>
@@ -1157,14 +1423,18 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
           </div>
 
           {/* Information Callout */}
-          <div className="bg-slate-50 rounded-3xl p-4 border border-slate-200 text-xs text-slate-600 space-y-2">
+          <div className="liquid-glass rounded-3xl p-4 border border-slate-200/90 text-xs text-slate-600 space-y-2 shadow-2xs">
             <p className="font-semibold text-slate-800 flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-teal-600" />
+              <Sparkles className="w-4 h-4 text-blue-600" />
               <span>Tips Penggunaan Kamera Isyarat</span>
             </p>
             <p className="leading-relaxed">
-              Kamera membaca gerakan tangan Anda langsung di perangkat. Aktifkan fitur <strong>"Ketik Otomatis"</strong> agar huruf langsung terangkai saat isyarat tangan Anda ditahan sejenak (~0.8 detik).
+              Kamera membaca gerakan tangan Anda langsung di perangkat. Aktifkan fitur <strong>"Ketik Otomatis"</strong> agar kata/huruf langsung terangkai saat gestur tangan ditahan atau diselesaikan.
             </p>
+            <div className="pt-2 border-t border-slate-200/80 space-y-1 text-[11px] text-slate-500">
+              <p><strong>🤲 Gestur 2 Tangan:</strong> <em>Terima Kasih</em> (dua telapak merapat/mengatup di dada), <em>Sama-sama</em> (dua telapak terbuka santun), <em>Tolong</em> (tangan bertumpuk), <em>Nama</em> (dua tangan huruf H menyilang).</p>
+              <p><strong>⚡ Gerak Dinamis &amp; Sapaan:</strong> <em>Halo</em> (lambaian atau salam pelipis ke luar), <em>Terima Kasih</em> (dorong maju dari dagu), <em>Maaf</em> (putar melingkar di dada), <em>Ya</em> (angguk kepalan), <em>Tidak</em> (geleng telunjuk), <em>Saya</em> (tunjuk dada), <em>Kamu</em> (tunjuk depan), <em>Bagus</em> (jempol mantap), <em>Sayang</em> (ILY), <em>Z</em> &amp; <em>J</em> (pola goresan udara).</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1173,21 +1443,21 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
       {isGeminiModalOpen && (
         <div
           id="gemini-inspection-modal-overlay"
-          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
           onClick={() => setIsGeminiModalOpen(false)}
         >
           <div
             id="gemini-inspection-modal-content"
-            className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4"
+            className="liquid-glass-modal rounded-3xl max-w-lg w-full p-6 shadow-xl border border-white/60 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Bot className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-slate-900">
+                  <h3 className="font-bold text-base text-slate-800">
                     Bantuan Cek Posisi Tangan
                   </h3>
                   <p className="text-xs text-slate-500">
@@ -1206,7 +1476,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
 
             {isAnalyzingWithGemini ? (
               <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
-                <RefreshCw className="w-8 h-8 text-teal-600 animate-spin" />
+                <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
                 <div>
                   <p className="text-sm font-bold text-slate-800">
                     Sedang Memeriksa Posisi Tangan...
@@ -1218,17 +1488,17 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
               </div>
             ) : geminiResult ? (
               <div className="space-y-4">
-                <div className="bg-teal-50/80 border border-teal-200 rounded-2xl p-4 flex items-center justify-between">
+                <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-4 flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-teal-800 font-semibold block">
+                    <span className="text-xs text-blue-800 font-semibold block">
                       Huruf / Kata Terbaca
                     </span>
-                    <span className="font-mono font-black text-2xl text-teal-950">
+                    <span className="font-mono font-black text-2xl text-slate-900">
                       {geminiResult.sign || (detectedLetter && detectedLetter !== '?' ? detectedLetter : 'A')}
                     </span>
                   </div>
                   <div className="text-right">
-                    <span className="text-xs text-teal-800 font-semibold block">
+                    <span className="text-xs text-blue-800 font-semibold block">
                       Tingkat Kecocokan
                     </span>
                     <span className="font-mono font-bold text-lg text-emerald-600">
@@ -1239,7 +1509,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
 
                 <div className="space-y-1.5">
                   <h4 className="text-xs font-bold text-slate-800">Hasil Pemeriksaan:</h4>
-                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <p className="text-xs text-slate-600 leading-relaxed bg-white/80 p-3 rounded-xl border border-slate-200/80">
                     {geminiResult.feedback ||
                       'Posisi tangan terdeteksi dengan baik. Pastikan seluruh jari berada di dalam bingkai kamera.'}
                   </p>
@@ -1250,8 +1520,8 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                     <h4 className="text-xs font-bold text-slate-800">Saran untuk Anda:</h4>
                     <ul className="space-y-1.5 text-xs text-slate-600">
                       {geminiResult.suggestions.map((sug, i) => (
-                        <li key={i} className="flex items-start gap-2 bg-white p-2 rounded-lg border border-slate-100">
-                          <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
+                        <li key={i} className="flex items-start gap-2 bg-white/80 p-2 rounded-lg border border-slate-200/80">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                           <span>{sug}</span>
                         </li>
                       ))}

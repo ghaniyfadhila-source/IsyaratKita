@@ -94,22 +94,30 @@ export async function getHandLandmarker(): Promise<HandLandmarker> {
   return initPromise;
 }
 
+export interface HandDrawItem {
+  landmarks: NormalizedLandmark[];
+  label?: string;
+  confidence?: number;
+  handedness?: 'Left' | 'Right';
+  trail?: { x: number; y: number }[];
+  isDynamic?: boolean;
+}
+
 /**
- * Renders the 21 hand landmarks and skeleton connections onto the canvas overlay
+ * Renders an individual hand's landmarks and skeleton onto the canvas
  */
-export function drawHandLandmarks(
+function drawSingleHand(
   ctx: CanvasRenderingContext2D,
   landmarks: NormalizedLandmark[],
   width: number,
   height: number,
-  isMirrored = true,
+  isMirrored: boolean = true,
   detectedSign?: string,
   confidence?: number,
   trail?: { x: number; y: number }[],
-  isDynamic?: boolean
+  isDynamic?: boolean,
+  handedness?: 'Left' | 'Right'
 ) {
-  ctx.clearRect(0, 0, width, height);
-
   // 0. Draw Motion Trail (Air drawing & dynamic trajectory)
   if (trail && trail.length > 1) {
     ctx.save();
@@ -186,14 +194,14 @@ export function drawHandLandmarks(
   const bboxH = Math.min(height - bboxY, maxY - minY + pad * 2);
 
   // 1. Draw subtle bounding box with corner guides
-  ctx.strokeStyle = 'rgba(20, 184, 166, 0.4)';
+  ctx.strokeStyle = handedness === 'Left' ? 'rgba(56, 189, 248, 0.4)' : 'rgba(20, 184, 166, 0.4)';
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 4]);
   ctx.strokeRect(bboxX, bboxY, bboxW, bboxH);
   ctx.setLineDash([]);
 
   // 2. Draw Skeleton Connections
-  ctx.strokeStyle = '#0d9488'; // Teal 600
+  ctx.strokeStyle = handedness === 'Left' ? '#0284c7' : '#0d9488'; // Blue for left, Teal for right
   ctx.lineWidth = 3.5;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -208,7 +216,7 @@ export function drawHandLandmarks(
   });
 
   // Glow line overlay for index finger & thumb (key discriminators)
-  ctx.strokeStyle = 'rgba(45, 212, 191, 0.7)';
+  ctx.strokeStyle = handedness === 'Left' ? 'rgba(56, 189, 248, 0.75)' : 'rgba(45, 212, 191, 0.75)';
   ctx.lineWidth = 2;
   [
     [0, 5],
@@ -244,14 +252,14 @@ export function drawHandLandmarks(
       ctx.stroke();
     } else if (isWrist) {
       ctx.arc(pt.x, pt.y, 6, 0, 2 * Math.PI);
-      ctx.fillStyle = '#0f766e';
+      ctx.fillStyle = handedness === 'Left' ? '#0369a1' : '#0f766e';
       ctx.fill();
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = '#ffffff';
       ctx.stroke();
     } else {
       ctx.arc(pt.x, pt.y, 4, 0, 2 * Math.PI);
-      ctx.fillStyle = '#2dd4bf'; // Cyan/teal joint
+      ctx.fillStyle = handedness === 'Left' ? '#38bdf8' : '#2dd4bf';
       ctx.fill();
       ctx.lineWidth = 1;
       ctx.strokeStyle = '#042f2e';
@@ -261,8 +269,9 @@ export function drawHandLandmarks(
 
   // 4. Floating Badge over Bounding Box
   if (detectedSign) {
-    const tagText = `SIBI ${detectedSign} (${confidence || 0}%)`;
-    ctx.font = 'bold 12px monospace';
+    const handLabel = handedness ? ` (${handedness === 'Left' ? 'Kiri' : 'Kanan'})` : '';
+    const tagText = `${detectedSign} ${confidence ? `${confidence}%` : ''}${handLabel}`;
+    ctx.font = 'bold 11px monospace';
     const textWidth = ctx.measureText(tagText).width;
     const tagW = textWidth + 16;
     const tagH = 22;
@@ -279,4 +288,92 @@ export function drawHandLandmarks(
     ctx.fillStyle = '#ffffff';
     ctx.fillText(tagText, tagX + 8, tagY + 15);
   }
+}
+
+/**
+ * Renders multiple hands (1 or 2 hands) onto the canvas overlay
+ */
+export function drawMultipleHands(
+  ctx: CanvasRenderingContext2D,
+  hands: HandDrawItem[],
+  width: number,
+  height: number,
+  isMirrored: boolean = true,
+  twoHandBanner?: string
+): void {
+  ctx.clearRect(0, 0, width, height);
+
+  if (!hands || hands.length === 0) return;
+
+  // Render each hand's skeleton
+  hands.forEach((hand) => {
+    drawSingleHand(
+      ctx,
+      hand.landmarks,
+      width,
+      height,
+      isMirrored,
+      hand.label,
+      hand.confidence,
+      hand.trail,
+      hand.isDynamic,
+      hand.handedness
+    );
+  });
+
+  // If two hands present and banner provided, render top center banner
+  if (twoHandBanner) {
+    ctx.save();
+    ctx.font = 'bold 13px system-ui, sans-serif';
+    const textWidth = ctx.measureText(twoHandBanner).width;
+    const bannerW = textWidth + 28;
+    const bannerH = 28;
+    const bannerX = (width - bannerW) / 2;
+    const bannerY = 16;
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    ctx.strokeStyle = 'rgba(45, 212, 191, 0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#2dd4bf';
+    ctx.fillText(twoHandBanner, bannerX + 14, bannerY + 19);
+    ctx.restore();
+  }
+}
+
+/**
+ * Backwards-compatible single-hand drawer
+ */
+export function drawHandLandmarks(
+  ctx: CanvasRenderingContext2D,
+  landmarks: NormalizedLandmark[],
+  width: number,
+  height: number,
+  isMirrored = true,
+  detectedSign?: string,
+  confidence?: number,
+  trail?: { x: number; y: number }[],
+  isDynamic?: boolean,
+  handedness?: 'Left' | 'Right'
+) {
+  drawMultipleHands(
+    ctx,
+    [
+      {
+        landmarks,
+        label: detectedSign,
+        confidence,
+        trail,
+        isDynamic,
+        handedness
+      }
+    ],
+    width,
+    height,
+    isMirrored
+  );
 }
