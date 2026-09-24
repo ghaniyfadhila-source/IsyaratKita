@@ -23,7 +23,6 @@ import {
   Clock,
   Timer
 } from 'lucide-react';
-import { SIBI_ALPHABET, SIBI_COMMON_WORDS } from '../data/sibiData';
 import { HandSignIllustration } from './HandSignIllustration';
 import { FingerStates, GeminiAnalysisResult, NormalizedLandmark, HandGestureResult } from '../types';
 import { getHandLandmarker, drawHandLandmarks, drawMultipleHands, HandDrawItem } from '../utils/mediaPipeService';
@@ -62,7 +61,6 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
   });
   const [isDynamicGesture, setIsDynamicGesture] = useState<boolean>(false);
   const [gestureType, setGestureType] = useState<'letter' | 'word' | 'greeting'>('letter');
-  const [activeSimTab, setActiveSimTab] = useState<'huruf' | 'kata'>('huruf');
   const [motionEnergy, setMotionEnergy] = useState<number>(0);
   const [dynamicSensitivity, setDynamicSensitivity] = useState<'normal' | 'tinggi' | 'responsif'>('tinggi');
   const [dynamicToast, setDynamicToast] = useState<string | null>(null);
@@ -563,7 +561,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
     } catch (err: any) {
       console.error('Camera or Model access error:', err);
       setCameraError(
-        'Kamera web tidak dapat diakses atau izin ditolak. Anda tetap dapat menggunakan simulator gestur SIBI di bawah untuk menguji alur terjemahan.'
+        'Kamera web tidak dapat diakses atau izin ditolak. Pastikan izin akses kamera aktif pada peramban Anda.'
       );
       setCameraActive(false);
     }
@@ -716,7 +714,7 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
   const fullDisplayResult = [sentenceBuffer, wordBuffer].filter(Boolean).join(' ');
 
   return (
-    <div id="sign-to-speech-section" className="space-y-6 max-w-5xl mx-auto">
+    <div id="sign-to-speech-section" className="space-y-6 max-w-7xl mx-auto">
       {/* Header Info */}
       <div className="liquid-glass rounded-3xl p-5 border border-slate-200/90 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -832,8 +830,8 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Camera / Hand Landmark Stage */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 shadow-md relative aspect-video flex flex-col items-center justify-center">
+        <div className="lg:col-span-8 space-y-4">
+          <div className="bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 shadow-xl relative w-full aspect-[4/3] sm:aspect-[16/10] md:aspect-[16/9] min-h-[460px] sm:min-h-[520px] md:min-h-[580px] lg:min-h-[620px] flex flex-col items-center justify-center">
             {/* Live Video Feed (Mirrored for natural self-mirroring) */}
             <video
               ref={videoRef}
@@ -855,18 +853,36 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
 
             {/* Offline / Placeholder Screen */}
             {!cameraActive && (
-              <div className="flex flex-col items-center justify-center text-center p-6 text-slate-400 space-y-3">
-                <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 shadow-inner">
-                  <Camera className="w-8 h-8 text-teal-400" />
+              <div className="flex flex-col items-center justify-center text-center p-8 sm:p-12 text-slate-400 space-y-4 max-w-md">
+                <div className="w-20 h-20 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 shadow-inner">
+                  <Camera className="w-10 h-10 text-blue-400" />
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-200">
+                <div className="space-y-1.5">
+                  <p className="text-base sm:text-lg font-bold text-slate-100">
                     Kamera Sedang Tidak Aktif
                   </p>
-                  <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                    Klik <strong>"Buka Kamera"</strong> untuk mulai menerjemahkan isyarat tangan Anda secara langsung, atau gunakan tombol huruf di bawah.
+                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                    Klik tombol di bawah atau tombol di bagian atas untuk mengaktifkan webcam dan mulai membaca gerakan isyarat tangan Anda secara langsung.
                   </p>
                 </div>
+                <button
+                  id="btn-start-camera-center"
+                  onClick={handleToggleCamera}
+                  disabled={isModelLoading}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold transition-all shadow-md active:scale-98 cursor-pointer"
+                >
+                  {isModelLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Menyiapkan Kamera...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-4 h-4" />
+                      <span>Buka Kamera Sekarang</span>
+                    </>
+                  )}
+                </button>
               </div>
             )}
 
@@ -1207,92 +1223,10 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
               </div>
             </div>
           </div>
-
-          {/* SIBI Quick Letter & Word Simulator */}
-          <div className="liquid-glass rounded-3xl p-4 border border-slate-200/90 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-blue-600" />
-                <span className="text-xs font-bold text-slate-800">
-                  Papan Ketik Isyarat Cepat
-                </span>
-              </div>
-
-              {/* Tab Selector */}
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
-                <button
-                  onClick={() => setActiveSimTab('huruf')}
-                  className={`px-3 py-1 rounded-lg transition-all ${
-                    activeSimTab === 'huruf'
-                      ? 'bg-white text-blue-700 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Huruf (A–Z)
-                </button>
-                <button
-                  onClick={() => setActiveSimTab('kata')}
-                  className={`px-3 py-1 rounded-lg transition-all ${
-                    activeSimTab === 'kata'
-                      ? 'bg-white text-blue-700 shadow-2xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Kata Sehari-hari
-                </button>
-              </div>
-            </div>
-
-            {activeSimTab === 'huruf' ? (
-              <div className="grid grid-cols-9 sm:grid-cols-13 gap-1.5 pt-1">
-                {SIBI_ALPHABET.map((sign) => (
-                  <button
-                    key={sign.id}
-                    onClick={() => handleAddLetter(sign.label)}
-                    className="h-9 rounded-xl font-mono font-bold text-xs bg-white/80 hover:bg-blue-600 hover:text-white border border-slate-200/80 transition-all flex items-center justify-center active:scale-95 shadow-2xs text-slate-800"
-                    title={`Isyarat Huruf ${sign.label}: ${sign.description}`}
-                  >
-                    {sign.label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                {[
-                  { label: 'Halo', desc: 'Lambaian tangan' },
-                  { label: 'Terima Kasih', desc: 'Sentuh dagu lalu maju' },
-                  { label: 'Sama-sama', desc: 'Kedua telapak memutar santun' },
-                  { label: 'Tolong', desc: 'Tangan kanan di atas tangan kiri' },
-                  { label: 'Maaf', desc: 'Putaran melingkar di dada' },
-                  { label: 'Bagus', desc: 'Ibu jari tegak mantap' },
-                  { label: 'Ya', desc: 'Kepalan mengangguk naik-turun' },
-                  { label: 'Tidak', desc: 'Telunjuk menggeleng kiri-kanan' },
-                  { label: 'Saya', desc: 'Telunjuk menunjuk dada' },
-                  { label: 'Kamu', desc: 'Telunjuk menunjuk lawan bicara' },
-                  { label: 'Nama', desc: 'Ketuk silang huruf H 2x' },
-                  { label: 'Sayang', desc: 'Gestur I Love You (ILY)' }
-                ].map((item) => (
-                  <button
-                    key={item.label}
-                    onClick={() => handleAddLetter(item.label)}
-                    className="p-2.5 rounded-xl text-left bg-white/80 hover:bg-white hover:border-blue-300 border border-slate-200/80 transition-all group active:scale-98 shadow-2xs"
-                    title={item.desc}
-                  >
-                    <span className="block text-xs font-bold text-slate-800 group-hover:text-blue-600">
-                      {item.label}
-                    </span>
-                    <span className="block text-[10px] text-slate-500 truncate mt-0.5">
-                      {item.desc}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Right Column: Translated Speech & Text Output Panel */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-4 space-y-4">
           <div className="liquid-glass rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <span className="text-sm font-bold text-slate-800">
