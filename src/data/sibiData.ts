@@ -142,9 +142,9 @@ export const SIBI_ALPHABET: SibiSign[] = [
     label: 'P',
     category: 'alfabet',
     shortDesc: 'Bentuk huruf K yang dibalik mengarah lurus ke bawah.',
-    description: 'Mirip huruf K tetapi posisi tangan dan telunjuk dibalik menghadap ke bawah.',
+    description: 'Mirip huruf K (telunjuk dan tengah terbuka dengan ibu jari di sela) tetapi posisi tangan dibalik mengarah ke bawah.',
     fingerGuide: 'Bentuk K mengarah ke bawah/lantai',
-    tips: 'Jari telunjuk mengarah lurus ke lantai.'
+    tips: 'Jari telunjuk dan tengah mengarah ke bawah.'
   },
   {
     id: 'q',
@@ -254,11 +254,11 @@ export const SIBI_COMMON_WORDS: SibiSign[] = [
     id: 'terima-kasih',
     label: 'Terima Kasih',
     category: 'sapaan',
-    shortDesc: 'Jemari sentuh dagu/bibir lalu gerakkan lurus maju ke depan.',
-    description: 'Ujung jemari tangan kanan menyentuh dagu atau bibir bawah, lalu digerakkan lurus ke depan menghadap lawan bicara.',
-    fingerGuide: 'Ujung jari di dagu/bibir bawah',
+    shortDesc: 'Jemari sentuh dagu lalu maju ke depan, atau katupkan 2 telapak di dada.',
+    description: 'Ujung jemari menyentuh dagu/bibir bawah lalu digerakkan lurus maju ke arah lawan bicara, atau mengatupkan kedua telapak tangan santun di depan dada.',
+    fingerGuide: 'Telapak terbuka maju dari dagu / 2 telapak mengatup',
     motion: 'Gerakan lurus maju ke arah lawan bicara',
-    tips: 'Bisa disertai anggukan kepala ramah.'
+    tips: 'Dapat diperagakan 1 tangan dari dagu atau 2 tangan mengatup santun.'
   },
   {
     id: 'sama-sama',
@@ -322,13 +322,43 @@ export const SIBI_COMMON_WORDS: SibiSign[] = [
   },
   {
     id: 'kabar-baik',
-    label: 'Baik / Sehat',
+    label: 'Baik / Bagus',
     category: 'kata-dasar',
     shortDesc: 'Ibu jari ditegakkan mengarah ke atas (jempol mantap) di dada.',
-    description: 'Ibu jari ditegakkan mengarah ke atas (jempol mantap) di depan dada sambil tersenyum.',
-    fingerGuide: 'Jempol tegak ke atas, 4 jari mengepal',
-    motion: 'Pegang mantap di depan dada',
-    tips: 'Menunjukkan kondisi positif atau persetujuan.'
+    description: 'Ibu jari ditegakkan mengarah tinggi ke atas (jempol mantap) dengan empat jari lainnya mengepal di depan dada.',
+    fingerGuide: 'Jempol tegak tinggi ke atas, 4 jari mengepal',
+    motion: 'Acungkan jempol mantap ke atas',
+    tips: 'Menunjukkan kondisi positif, pujian (bagus), atau kabar baik.'
+  },
+  {
+    id: 'ya',
+    label: 'Ya / Setuju',
+    category: 'kata-dasar',
+    shortDesc: 'Kepalan tangan digerakkan mengangguk ke atas dan ke bawah.',
+    description: 'Kepalkan tangan seperti huruf A/S lalu gerakkan mengangguk naik-turun dari pergelangan tangan menyerupai anggukan kepala.',
+    fingerGuide: 'Semua jari mengepal | Pergelangan: Mengangguk naik-turun',
+    motion: 'Ayunan vertikal ke atas dan ke bawah',
+    tips: 'Digunakan untuk menyatakan persetujuan atau jawaban positif.'
+  },
+  {
+    id: 'tidak',
+    label: 'Tidak / Bukan',
+    category: 'kata-dasar',
+    shortDesc: 'Jari telunjuk tegak digoyangkan menggeleng ke kiri dan kanan.',
+    description: 'Tegakkan jari telunjuk sementara jari lainnya mengepal, lalu goyangkan telunjuk ke kiri dan ke kanan secara berulang.',
+    fingerGuide: 'Telunjuk: Tegak menggeleng kiri-kanan | Jari lain: Mengepal',
+    motion: 'Ayunan horizontal telunjuk ke kiri-kanan',
+    tips: 'Menunjukkan penolakan, larangan, atau sanggahan.'
+  },
+  {
+    id: 'sayang',
+    label: 'Sayang / Cinta',
+    category: 'sapaan',
+    shortDesc: 'Jempol, telunjuk, dan kelingking terbuka, jari tengah & manis dilipat.',
+    description: 'Rentangkan ibu jari, jari telunjuk, dan jari kelingking ke atas sementara jari tengah dan jari manis ditekuk ke telapak tangan (isyarat I Love You).',
+    fingerGuide: 'Jempol, Telunjuk & Kelingking: Tegak | Tengah & Manis: Terlipat',
+    motion: 'Tahan menghadap ke depan dengan hangat',
+    tips: 'Ungkapan kasih sayang dan kepedulian yang universal dalam bahasa isyarat.'
   }
 ];
 

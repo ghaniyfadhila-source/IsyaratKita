@@ -18,10 +18,9 @@ export default function App() {
   const [isDictionaryOpen, setIsDictionaryOpen] = useState<boolean>(false);
   const [isTestGuideOpen, setIsTestGuideOpen] = useState<boolean>(false);
   const [isContactOpen, setIsContactOpen] = useState<boolean>(false);
-  const [history, setHistory] = useState<TranslationHistoryItem[]>([]);
+  const [_history, setHistory] = useState<TranslationHistoryItem[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Load history from localStorage on initial render
   useEffect(() => {
     const saved = getSavedHistory();
     setHistory(saved);
@@ -88,7 +87,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex flex-col space-y-8 sm:space-y-10">
-        {/* Modern Minimalist Hero Section with Large Liquid Glass Search */}
+        {/* Hero Section with Glass Search */}
         <HeroSection
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -106,23 +105,18 @@ export default function App() {
 
         {/* Translator Main Section */}
         <div id="translator-main-section" className="space-y-6 pt-2">
-          {/* Subtle Status Notice */}
-          <div className="liquid-glass rounded-2xl p-4 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs border border-slate-200/90">
+          {/* Status Notice */}
+          <div className="liquid-glass rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-slate-200/90">
             <div className="flex items-start sm:items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
                 <CheckCircle2 className="w-4 h-4" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                    Interaktif Real-time
-                  </span>
-                  <span className="text-xs font-bold text-slate-800">
-                    Penerjemah Bahasa Isyarat &amp; Suara Dua Arah
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Ubah ucapan/tulisan menjadi isyarat tangan 3D SIBI, atau arahkan kamera tangan untuk menerjemahkan ke ucapan suara.
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                  Penerjemah Bahasa Isyarat &amp; Suara Dua Arah
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+                  Ubah ucapan atau tulisan menjadi peragaan tangan SIBI, atau arahkan kamera tangan untuk menerjemahkan ke ucapan suara.
                 </p>
               </div>
             </div>
@@ -130,7 +124,7 @@ export default function App() {
             <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
               <button
                 onClick={() => setIsTestGuideOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-2xs active:scale-98"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors active:scale-98 cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Petunjuk Cepat</span>
@@ -138,7 +132,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Two-Way Mode Selector (Pill Style) */}
+          {/* Two-Way Mode Selector */}
           <ModeSelector
             currentMode={currentMode}
             onSelectMode={(mode) => setCurrentMode(mode)}
@@ -175,21 +169,21 @@ export default function App() {
           <div className="flex items-center gap-2">
             <HeartHandshake className="w-4 h-4 text-blue-600" />
             <span>
-              <strong>IsyaratKita</strong> • Dibuat oleh{' '}
+              <strong className="text-slate-900">IsyaratKita</strong> • Dibuat oleh{' '}
               <button
                 onClick={() => setIsContactOpen(true)}
-                className="font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                className="font-bold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer"
               >
                 Ghaniy Fadhila
               </button>
             </span>
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap justify-center">
+          <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap justify-center">
             <span>Standar SIBI (Sistem Isyarat Bahasa Indonesia)</span>
             <span>•</span>
             <button
               onClick={() => setIsContactOpen(true)}
-              className="hover:text-blue-600 font-semibold underline decoration-dotted"
+              className="hover:text-blue-700 font-semibold underline decoration-dotted cursor-pointer"
             >
               Kontak &amp; Informasi
             </button>
@@ -206,6 +200,7 @@ export default function App() {
       <DictionaryModal
         isOpen={isDictionaryOpen}
         onClose={() => setIsDictionaryOpen(false)}
+        onPracticeInCamera={handlePracticeInCamera}
       />
 
       {/* Step-by-Step Testing Guide Modal */}

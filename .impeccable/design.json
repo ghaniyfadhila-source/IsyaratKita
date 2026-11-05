@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-05T14:43:00+07:00",
+  "title": "Design System: IsyaratKita",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Civic Cobalt",
+        "canonical": "#2563eb",
+        "tonalRamp": ["#172554", "#1e3a8a", "#1d4ed8", "#2563eb", "#3b82f6", "#60a5fa", "#bfdbfe", "#eff6ff"]
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Deep Cobalt",
+        "canonical": "#1d4ed8",
+        "tonalRamp": ["#172554", "#1e3a8a", "#1e40af", "#1d4ed8", "#2563eb", "#3b82f6", "#93c5fd", "#dbeafe"]
+      },
+      "primary-soft": {
+        "role": "primary",
+        "displayName": "Cobalt Tint",
+        "canonical": "#eff6ff",
+        "tonalRamp": ["#1e3a8a", "#1d4ed8", "#3b82f6", "#60a5fa", "#93c5fd", "#bfdbfe", "#dbeafe", "#eff6ff"]
+      },
+      "accent-mint": {
+        "role": "secondary",
+        "displayName": "Signal Mint",
+        "canonical": "#10b981",
+        "tonalRamp": ["#064e3b", "#065f46", "#047857", "#059669", "#10b981", "#34d399", "#a7f3d0", "#ecfdf5"]
+      },
+      "neutral-canvas": {
+        "role": "neutral",
+        "displayName": "Alabaster Slate Canvas",
+        "canonical": "#f8fafc",
+        "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#e2e8f0", "#f8fafc"]
+      },
+      "surface-pure": {
+        "role": "neutral",
+        "displayName": "Pure Daylight Surface",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#1e293b", "#334155", "#64748b", "#94a3b8", "#cbd5e1", "#e2e8f0", "#f1f5f9", "#ffffff"]
+      },
+      "text-primary": {
+        "role": "neutral",
+        "displayName": "Slate Ink",
+        "canonical": "#1e293b",
+        "tonalRamp": ["#020617", "#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#cbd5e1", "#f1f5f9"]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Muted Slate",
+        "canonical": "#475569",
+        "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#e2e8f0", "#f8fafc"]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Cool Steel",
+        "canonical": "#64748b",
+        "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#f1f5f9"]
+      },
+      "border-subtle": {
+        "role": "neutral",
+        "displayName": "Hairline Slate",
+        "canonical": "#e2e8f0",
+        "tonalRamp": ["#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#e2e8f0", "#f8fafc"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero headline introducing IsyaratKita." },
+      "headline": { "displayName": "Headline", "purpose": "Section headers across translator and learning modules." },
+      "title": { "displayName": "Title", "purpose": "Mode switcher cards, sign cards, and modal headers." },
+      "body": { "displayName": "Body", "purpose": "Anatomical finger instructions and AI feedback prose." },
+      "label": { "displayName": "Label", "purpose": "Pill badges, category tags, and compact CTAs." }
+    },
+    "shadows": [
+      { "name": "glass-rest", "value": "0 8px 32px 0 rgba(31, 38, 135, 0.07)", "purpose": "Default elevation for liquid-glass surfaces." },
+      { "name": "card-hover-lift", "value": "0 16px 36px 0 rgba(31, 38, 135, 0.10)", "purpose": "Hover elevation on interactive SIBI sign cards." },
+      { "name": "modal-float", "value": "0 20px 50px 0 rgba(31, 38, 135, 0.12)", "purpose": "High-blur modal dialogs and drawers." }
+    ],
+    "motion": [
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Card hover lift and smooth UI transitions." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Pill Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary pill action button used in navbar and search CTAs.",
+      "html": "<button class=\"ds-btn-primary\">Panduan Pakai</button>",
+      "css": ".ds-btn-primary { background: #2563eb; color: #ffffff; padding: 8px 16px; border-radius: 9999px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 700; border: none; cursor: pointer; transition: background 0.2s ease, transform 0.15s ease; } .ds-btn-primary:hover { background: #1d4ed8; } .ds-btn-primary:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Quick Search Chip",
+      "kind": "chip",
+      "refersTo": "chip-quick",
+      "description": "Interactive suggestion chip below the hero search bar.",
+      "html": "<button class=\"ds-chip-quick\">Terima Kasih</button>",
+      "css": ".ds-chip-quick { background: rgba(255, 255, 255, 0.75); color: #334155; padding: 4px 10px; border-radius: 9999px; border: 1px solid #e2e8f0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; } .ds-chip-quick:hover { background: #ffffff; color: #2563eb; border-color: #bfdbfe; }"
+    },
+    {
+      "name": "Liquid Glass Card",
+      "kind": "card",
+      "refersTo": "card-glass",
+      "description": "Translucent glassmorphic card for SIBI signs and workspace panels.",
+      "html": "<div class=\"ds-card-glass\"><span class=\"ds-badge\">SIBI</span><h4 class=\"ds-title\">Terima Kasih</h4><p class=\"ds-desc\">Sentuhkan ujung jari ke bibir lalu gerakkan maju.</p></div>",
+      "css": ".ds-card-glass { background: rgba(255, 255, 255, 0.65); backdrop-filter: blur(16px); border: 1px solid rgba(226, 232, 240, 0.9); border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px 0 rgba(31, 38, 135, 0.06); font-family: 'Plus Jakarta Sans', sans-serif; transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease; } .ds-card-glass:hover { transform: translateY(-5px); box-shadow: 0 16px 36px 0 rgba(31, 38, 135, 0.1); border-color: rgba(59, 130, 246, 0.35); } .ds-badge { display: inline-block; background: #eff6ff; color: #1d4ed8; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 9999px; border: 1px solid #bfdbfe; } .ds-title { margin: 8px 0 4px; font-size: 16px; font-weight: 700; color: #1e293b; } .ds-desc { margin: 0; font-size: 13px; color: #475569; line-height: 1.5; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Translucent Civic Studio",
+    "overview": "IsyaratKita combines approachable civic clarity with tactile translucent glass surfaces (\"Liquid Glass\"). Because the platform serves as a real-time bridge between Deaf/hard-of-hearing signers (Teman Tuli) and hearing speakers (Teman Dengar), every surface prioritizes immediate legibility, calm visual hierarchy, and unambiguous status feedback.",
+    "keyCharacteristics": [
+      "Liquid Glass Surfaces: Translucent white layers paired with backdrop-filter blur and specular borders.",
+      "Single Humanist Sans-Serif: Geometric warmth and high legibility across all scales using Plus Jakarta Sans.",
+      "Dual-Modality Status Signaling: Cobalt blue anchors primary actions, while emerald mint signals active camera tracking and verified SIBI gestures."
+    ],
+    "rules": [
+      {
+        "name": "The Dual-Signal Rule",
+        "body": "Reserve Civic Cobalt (#2563eb) for user-initiated controls and navigation, and reserve Signal Mint (#10b981) for live sensor readiness, verified hand tracking, and positive accuracy feedback.",
+        "section": "colors"
+      },
+      {
+        "name": "The Webcam-Distance Rule",
+        "body": "Never set active gesture readouts or live transcript text below 16px (1rem), ensuring a signer standing back from their camera can read detections without squinting.",
+        "section": "typography"
+      },
+      {
+        "name": "The Specular Edge Rule",
+        "body": "Every blurred glass surface must pair its translucent background with a 1px solid semi-opaque white or slate border so card boundaries remain crisp against white backgrounds.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do pair every audio/speech output control with a visible text transcript or status badge so Deaf and hearing users receive equivalent feedback.",
+      "Do use .liquid-glass and .liquid-glass-card classes with 1px borders to preserve depth on light backgrounds.",
+      "Do display clear anatomical finger instructions alongside SIBI letter and word cards."
+    ],
+    "donts": [
+      "Don't place unbordered white cards directly on the #f8fafc–#ffffff background where boundaries disappear.",
+      "Don't rely on sound-only alerts or color-only error states without accompanying text and icons.",
+      "Don't clutter the camera viewport overlay; keep landmark skeleton lines and hold-progress bars clean and unobstructed."
+    ]
+  }
+}
