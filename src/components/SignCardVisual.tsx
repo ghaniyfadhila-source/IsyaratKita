@@ -1,123 +1,180 @@
 import React from 'react';
 import { SibiSign } from '../types';
+import { MoveRight, Hand } from 'lucide-react';
 import { HandSignIllustration } from './HandSignIllustration';
-import { ArrowUpRight } from 'lucide-react';
 
 interface SignCardVisualProps {
   sign: SibiSign;
-  size?: 'sm' | 'md' | 'lg' | 'compact';
+  size?: 'compact' | 'sm' | 'md' | 'lg';
   highlight?: boolean;
+  isActive?: boolean;
   onClick?: () => void;
 }
+
+const TWO_HAND_IDS = new Set(['terima-kasih', 'sama-sama', 'tolong', 'perkenalkan', 'nama']);
+const DYNAMIC_IDS = new Set([
+  'j',
+  'z',
+  'halo',
+  'terima-kasih',
+  'sama-sama',
+  'tolong',
+  'maaf',
+  'perkenalkan',
+  'nama',
+  'ya',
+  'tidak',
+]);
 
 export const SignCardVisual: React.FC<SignCardVisualProps> = ({
   sign,
   size = 'md',
   highlight = false,
-  onClick
+  isActive = false,
+  onClick,
 }) => {
-  const config = {
+  const active = highlight || isActive;
+  const isTwoHand = TWO_HAND_IDS.has(sign.id);
+  const isDynamic = DYNAMIC_IDS.has(sign.id) || Boolean(sign.motion);
+
+  const sizeConfig = {
     compact: {
-      container: 'w-24 h-32 p-2.5 text-xs',
-      illusSize: 52,
+      card: 'w-28 sm:w-32 p-2.5',
+      title: 'text-sm',
+      illusSize: 54,
       showDesc: false,
       showBadge: false,
-      titleSize: 'text-sm font-bold'
     },
     sm: {
-      container: 'w-full h-full min-h-[224px] p-4 text-xs',
+      card: 'w-34 sm:w-38 p-3',
+      title: 'text-base',
+      illusSize: 64,
+      showDesc: true,
+      showBadge: true,
+    },
+    md: {
+      card: 'w-44 sm:w-48 p-3.5',
+      title: 'text-xl',
       illusSize: 88,
       showDesc: true,
       showBadge: true,
-      titleSize: 'text-base font-bold'
-    },
-    md: {
-      container: 'w-52 min-h-[270px] p-4 text-sm',
-      illusSize: 104,
-      showDesc: true,
-      showBadge: true,
-      titleSize: 'text-lg font-bold'
     },
     lg: {
-      container: 'w-64 min-h-[310px] p-5 text-base',
-      illusSize: 124,
+      card: 'w-60 sm:w-64 p-5',
+      title: 'text-3xl',
+      illusSize: 120,
       showDesc: true,
       showBadge: true,
-      titleSize: 'text-xl font-bold'
-    }
+    },
   }[size];
 
-  const categoryColorMap: Record<string, { bg: string; text: string }> = {
-    alfabet: { bg: 'bg-blue-50 text-blue-800 border-blue-200', text: 'Alfabet' },
-    sapaan: { bg: 'bg-emerald-50 text-emerald-800 border-emerald-200', text: 'Sapaan' },
-    'kata-dasar': { bg: 'bg-slate-100 text-slate-700 border-slate-200', text: 'Kata Dasar' },
-    angka: { bg: 'bg-sky-50 text-sky-800 border-sky-200', text: 'Angka' }
-  };
-
-  const catStyle = categoryColorMap[sign.category] || categoryColorMap['alfabet'];
+  const categoryStamp =
+    {
+      alfabet: {
+        bg: 'bg-[#DBEAFE]',
+        text: 'text-[#1E3A8A]',
+        label: 'Alfabet',
+      },
+      sapaan: {
+        bg: 'bg-[#D1FAE5]',
+        text: 'text-[#065F46]',
+        label: 'Sapaan',
+      },
+      'kata-dasar': {
+        bg: 'bg-[#FEF3C7]',
+        text: 'text-[#92400E]',
+        label: 'Kata Dasar',
+      },
+      angka: {
+        bg: 'bg-[#FCE7F3]',
+        text: 'text-[#9D174D]',
+        label: 'Angka',
+      },
+    }[sign.category] || {
+      bg: 'bg-[#EAE4D7]',
+      text: 'text-[#141210]',
+      label: 'SIBI',
+    };
 
   return (
     <div
-      id={`sign-card-${sign.id}`}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
-      onKeyDown={(e) => {
-        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      className={`group relative flex flex-col items-center justify-between rounded-2xl liquid-glass-card select-none transition-all duration-200 ${
-        config.container
-      } ${
-        highlight
-          ? 'ring-2 ring-blue-600 bg-white/95 shadow-md'
-          : 'hover:border-blue-300'
-      } ${onClick ? 'cursor-pointer' : ''}`}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      className={`tactile-card rounded-2xl flex flex-col justify-between select-none relative overflow-hidden ${
+        sizeConfig.card
+      } ${onClick ? 'cursor-pointer' : ''} ${
+        active
+          ? 'ring-2 ring-[#1D4ED8] bg-[#EFF6FF] shadow-[5px_5px_0px_#1D4ED8] -translate-y-1'
+          : ''
+      }`}
     >
-      {/* Top Bar: Letter/Word Badge & Category */}
-      <div className="w-full flex items-center justify-between gap-1.5 mb-1">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-blue-600 text-white font-mono font-bold text-xs shrink-0">
-            {sign.label.length <= 2 ? sign.label : sign.label.charAt(0)}
+      {/* Top Index Header */}
+      {sizeConfig.showBadge && (
+        <div className="w-full flex items-center justify-between gap-1 mb-2">
+          <span
+            className={`font-mono text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-[#1C1917] ${categoryStamp.bg} ${categoryStamp.text}`}
+          >
+            {categoryStamp.label}
           </span>
-          <span className={`${config.titleSize} text-slate-900 tracking-tight truncate`}>
-            {sign.label}
-          </span>
-        </div>
 
-        <div className="flex items-center gap-1 shrink-0">
-          {config.showBadge && (
+          {isTwoHand ? (
             <span
-              className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${catStyle.bg}`}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#141210] text-[#FDE68A] font-mono text-xs font-bold"
+              title="Gestur 2 Tangan"
             >
-              {catStyle.text}
+              <Hand className="w-3 h-3" />
+              <span>2T</span>
             </span>
-          )}
-          {onClick && (
-            <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-blue-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-          )}
+          ) : isDynamic ? (
+            <span
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#FFEDD5] text-[#9A3412] border border-[#1C1917] font-mono text-xs font-bold"
+              title="Gestur Dinamis (Bergerak)"
+            >
+              <MoveRight className="w-3 h-3" />
+            </span>
+          ) : null}
         </div>
-      </div>
+      )}
 
-      {/* Hand Gesture Illustration Graphic (flat hierarchy, no nested card box) */}
-      <div className="flex-1 flex flex-col items-center justify-center my-2 w-full relative group-hover:scale-105 transition-transform duration-200">
+      {/* Anatomical SVG Specimen Stage */}
+      <div className="my-1 py-2 flex items-center justify-center w-full bg-[#F6F3EC] rounded-xl border border-[#D4CBB8]">
         <HandSignIllustration
           signId={sign.id}
-          size={config.illusSize}
-          animate={true}
+          size={sizeConfig.illusSize}
+          animate={active}
         />
       </div>
 
-      {/* Description Snippet */}
-      {config.showDesc && (
-        <div className="w-full text-center mt-1 border-t border-slate-200/70 pt-2.5">
-          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+      {/* Sign Title & Movement Formula */}
+      <div className="text-center w-full mt-2 pt-2 border-t border-[#E5DEC9]">
+        <div
+          className={`font-display font-extrabold tracking-tight text-[#141210] truncate ${sizeConfig.title}`}
+        >
+          {sign.label}
+        </div>
+        {sizeConfig.showDesc && (
+          <p className="text-xs text-[#44403C] line-clamp-2 mt-1 leading-snug font-medium">
             {sign.shortDesc || sign.description}
           </p>
-        </div>
-      )}
+        )}
+        {size === 'lg' && sign.motion && (
+          <div className="mt-2.5 px-2.5 py-1.5 rounded-lg bg-[#EAE4D7] border border-[#1C1917] text-xs font-bold text-[#141210] flex items-center justify-center gap-1.5">
+            <MoveRight className="w-3.5 h-3.5 shrink-0 text-[#C2410C]" />
+            <span>{sign.motion}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -1,135 +1,173 @@
 import React, { useState } from 'react';
-import { SibiSign } from '../types';
-import { SIBI_ALPHABET, SIBI_COMMON_WORDS } from '../data/sibiData';
-import { SignCardVisual } from './SignCardVisual';
-import { HandSignIllustration } from './HandSignIllustration';
 import {
   BookOpen,
-  Video,
-  Volume2,
+  Sparkles,
+  Hand,
+  MessageSquare,
+  Award,
   X,
-  ArrowRight,
-  Search,
-  Layers
+  Volume2,
+  Camera,
+  MoveRight,
 } from 'lucide-react';
+import { SIBI_ALPHABET, SIBI_COMMON_WORDS } from '../data/sibiData';
+import { SignCardVisual } from './SignCardVisual';
+import { SibiSign } from '../types';
 
 interface LearningModulesGridProps {
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
-  onPracticeInCamera: (sign: SibiSign) => void;
-  onSpeak: (text: string) => void;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
+  onPracticeInCamera?: (sign: SibiSign) => void;
+  onSpeak?: (text: string) => void;
 }
 
-export interface LearningModuleItem {
-  id: string;
-  title: string;
-  category: string;
-  badge: string;
-  description: string;
-  count: number;
-  highlightSigns: string[];
-}
+const ALL_DICTIONARY: SibiSign[] = [...SIBI_ALPHABET, ...SIBI_COMMON_WORDS];
+const TWO_HAND_IDS = ['terima-kasih', 'sama-sama', 'tolong', 'perkenalkan', 'nama'];
 
 export const LearningModulesGrid: React.FC<LearningModulesGridProps> = ({
-  searchQuery,
+  searchQuery = '',
   onSearchChange,
   onPracticeInCamera,
-  onSpeak
+  onSpeak,
 }) => {
-  const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [selectedSign, setSelectedSign] = useState<SibiSign | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<
+    'all' | 'alfabet' | 'kata-dasar' | 'dua-tangan'
+  >('all');
+  const [activeSignDetail, setActiveSignDetail] = useState<SibiSign | null>(null);
 
-  const modulesList: LearningModuleItem[] = [
+  const modules = [
     {
-      id: 'mod-1',
-      title: 'Dasar Alfabet SIBI A–Z',
-      category: 'alfabet',
-      badge: 'Dasar • 26 Huruf',
-      description: 'Penguasaan 26 bentuk jari manual untuk mengeja nama orang, kata baru, dan ejaan baku.',
-      count: 26,
-      highlightSigns: ['a', 'b', 'c', 'd', 'e']
+      id: 'alfabet-dasar',
+      index: 'MODUL 01',
+      title: 'Alfabet Jari SIBI (A–Z)',
+      subtitle: '26 Huruf Standar Nasional',
+      description:
+        'Kuasai formasi jari satu tangan untuk mengeja nama, istilah khusus, atau kata yang belum memiliki isyarat tunggal.',
+      icon: BookOpen,
+      headerBg: 'bg-[#1D4ED8] text-white',
+      badgeBg: 'bg-[#DBEAFE] text-[#1E3A8A]',
+      count: '26 Isyarat',
+      signs: SIBI_ALPHABET.slice(0, 6),
     },
     {
-      id: 'mod-2',
-      title: 'Sapaan & Kesantunan',
-      category: 'sapaan',
-      badge: 'Penting • 5 Kata',
-      description: 'Kosakata esensial untuk menyapa, berterima kasih, meminta maaf, dan mengungkapkan kasih sayang.',
-      count: 5,
-      highlightSigns: ['halo', 'terima-kasih', 'sama-sama', 'maaf', 'sayang']
+      id: 'sapaan',
+      index: 'MODUL 02',
+      title: 'Sapaan & Etika Sosial',
+      subtitle: 'Percakapan Pembuka Ramah',
+      description:
+        'Ungkapan sopan santun sehari-hari seperti Halo, Terima Kasih, Sama-sama, Maaf, dan Sayang.',
+      icon: Hand,
+      headerBg: 'bg-[#047857] text-white',
+      badgeBg: 'bg-[#D1FAE5] text-[#065F46]',
+      count: `${SIBI_COMMON_WORDS.filter((s) => s.category === 'sapaan').length} Isyarat`,
+      signs: SIBI_COMMON_WORDS.filter((s) => s.category === 'sapaan'),
     },
     {
-      id: 'mod-3',
-      title: 'Kata Dasar & Percakapan',
-      category: 'kata-dasar',
-      badge: 'Harian • 8 Kata',
-      description: 'Menunjuk diri sendiri, memperkenalkan nama, menyatakan ya/tidak, meminta tolong, dan kabar baik.',
-      count: 8,
-      highlightSigns: ['saya', 'perkenalkan', 'kabar-baik', 'ya']
+      id: 'kata-dasar',
+      index: 'MODUL 03',
+      title: 'Kata Ganti & Ekspresi',
+      subtitle: 'Komunikasi Inti Harian',
+      description:
+        'Kosakata frekuensi tinggi seperti Saya, Kamu, Perkenalkan, Tolong, Baik/Bagus, Ya, dan Tidak.',
+      icon: MessageSquare,
+      headerBg: 'bg-[#C2410C] text-white',
+      badgeBg: 'bg-[#FFEDD5] text-[#9A3412]',
+      count: `${SIBI_COMMON_WORDS.filter((s) => s.category === 'kata-dasar').length} Isyarat`,
+      signs: SIBI_COMMON_WORDS.filter((s) => s.category === 'kata-dasar'),
     },
     {
-      id: 'mod-4',
-      title: 'Gerakan Dua Tangan SIBI',
-      category: 'dua-tangan',
-      badge: 'Koordinasi • 4 Isyarat',
-      description: 'Gerakan terkoordinasi menggunakan kedua telapak tangan yang saling berhadapan, bertumpuk, atau menyilang.',
-      count: 4,
-      highlightSigns: ['terima-kasih', 'tolong', 'sama-sama', 'perkenalkan']
-    }
+      id: 'dua-tangan',
+      index: 'MODUL 04',
+      title: 'Koordinasi 2 Tangan',
+      subtitle: 'Deteksi Simultan MediaPipe',
+      description:
+        'Isyarat yang melibatkan koordinasi aktif kedua tangan sekaligus: Terima Kasih, Sama-sama, Tolong, dan Perkenalkan.',
+      icon: Award,
+      headerBg: 'bg-[#141210] text-[#FDE68A]',
+      badgeBg: 'bg-[#FDE68A] text-[#141210]',
+      count: '4 Isyarat 2T',
+      signs: SIBI_COMMON_WORDS.filter((s) => TWO_HAND_IDS.includes(s.id)),
+    },
   ];
 
-  const allSigns: SibiSign[] = [...SIBI_ALPHABET, ...SIBI_COMMON_WORDS];
+  const categoryFiltered =
+    selectedCategory === 'all'
+      ? ALL_DICTIONARY
+      : selectedCategory === 'alfabet'
+        ? SIBI_ALPHABET
+        : selectedCategory === 'dua-tangan'
+          ? SIBI_COMMON_WORDS.filter((s) => TWO_HAND_IDS.includes(s.id))
+          : SIBI_COMMON_WORDS;
 
-  const filteredSigns = allSigns.filter((sign) => {
-    const q = searchQuery.toLowerCase().trim();
-    const matchesSearch =
-      !q ||
-      sign.label.toLowerCase().includes(q) ||
-      sign.description.toLowerCase().includes(q) ||
-      (sign.shortDesc && sign.shortDesc.toLowerCase().includes(q));
+  const displayedSigns = searchQuery.trim()
+    ? ALL_DICTIONARY.filter(
+        (s) =>
+          s.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (s.shortDesc && s.shortDesc.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : categoryFiltered;
 
-    if (!matchesSearch) return false;
-
-    if (activeCategory === 'all') return true;
-    if (activeCategory === 'alfabet') return sign.category === 'alfabet';
-    if (activeCategory === 'sapaan') return sign.category === 'sapaan';
-    if (activeCategory === 'kata-dasar') return sign.category === 'kata-dasar';
-    if (activeCategory === 'dua-tangan') {
-      return ['terima-kasih', 'sama-sama', 'tolong', 'perkenalkan'].includes(sign.id);
+  const speakSign = (label: string) => {
+    if (onSpeak) {
+      onSpeak(label);
+      return;
     }
-    return true;
-  });
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(label);
+      utterance.lang = 'id-ID';
+      window.speechSynthesis.speak(utterance);
+    }
+  };
 
   return (
-    <section id="modul-belajar-section" className="w-full space-y-6 pt-4">
-      {/* Section Header (Direct heading without eyebrow kicker) */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-4">
+    <section
+      id="modul-belajar-section"
+      className="w-full py-10 border-t-2 border-[#1C1917]"
+    >
+      {/* Section Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-            Modul Belajar &amp; Kamus Isyarat SIBI
+          <span className="font-mono text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-[#FDE68A] text-[#141210] border border-[#1C1917] inline-block mb-2">
+            KURIKULUM &amp; ENSIKLOPEDIA VISUAL SIBI
+          </span>
+          <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-[#141210] tracking-tight">
+            Katalog Modul &amp; Kartu Spesimen Isyarat
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-2xl">
-            Jelajahi materi modul terstruktur atau cari kosakata alfabet dan kata sapaan langsung dengan panduan jari yang jelas.
+          <p className="text-sm sm:text-base text-[#44403C] mt-1 max-w-2xl">
+            Klik modul untuk memfilter kategori, atau pilih kartu isyarat mana pun untuk mendengar
+            pengucapan dan mempraktikkannya langsung di depan kamera AI.
           </p>
         </div>
 
-        {/* Filter Categories Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-          {[
-            { id: 'all', label: 'Semua Materi' },
-            { id: 'modul', label: 'Modul Belajar' },
-            { id: 'alfabet', label: 'Alfabet A–Z' },
-            { id: 'sapaan', label: 'Sapaan' },
-            { id: 'kata-dasar', label: 'Kata Dasar' },
-            { id: 'dua-tangan', label: '2 Tangan' }
-          ].map((tab) => (
+        {/* Category Filter Tabs */}
+        <div
+          className="flex items-center bg-[#EAE4D7] p-1.5 rounded-2xl border-2 border-[#1C1917] self-start flex-wrap"
+          role="tablist"
+          aria-label="Filter kategori kamus SIBI"
+        >
+          {(
+            [
+              { key: 'all', label: `Semua (${ALL_DICTIONARY.length})` },
+              { key: 'alfabet', label: 'Alfabet A–Z' },
+              { key: 'kata-dasar', label: 'Kosakata' },
+              { key: 'dua-tangan', label: '2 Tangan' },
+            ] as const
+          ).map((tab) => (
             <button
-              key={tab.id}
-              onClick={() => setActiveCategory(tab.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                activeCategory === tab.id
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-white/90 hover:bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={selectedCategory === tab.key}
+              onClick={() => {
+                setSelectedCategory(tab.key);
+                onSearchChange?.('');
+              }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                selectedCategory === tab.key && !searchQuery.trim()
+                  ? 'bg-[#141210] text-[#FDE68A] shadow-[2px_2px_0px_#1D4ED8]'
+                  : 'text-[#44403C] hover:text-[#141210]'
               }`}
             >
               {tab.label}
@@ -138,236 +176,209 @@ export const LearningModulesGrid: React.FC<LearningModulesGridProps> = ({
         </div>
       </div>
 
-      {/* Module Overview Cards Grid */}
-      {(activeCategory === 'all' || activeCategory === 'modul') && !searchQuery && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-blue-600" />
-              <span>Modul Pembelajaran Terstruktur</span>
-            </h3>
-            <span className="text-xs text-slate-600 tabular-nums">4 Modul Tersedia</span>
-          </div>
+      {/* 4 Numbered Module Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+        {modules.map((mod) => {
+          const IconComponent = mod.icon;
+          const targetCategory =
+            mod.id === 'alfabet-dasar'
+              ? 'alfabet'
+              : mod.id === 'dua-tangan'
+                ? 'dua-tangan'
+                : 'kata-dasar';
+          const isSelected = selectedCategory === targetCategory && !searchQuery.trim();
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {modulesList.map((mod) => (
-              <div
-                key={mod.id}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setActiveCategory(mod.category === 'dua-tangan' ? 'dua-tangan' : mod.category);
-                  }
-                }}
-                className="liquid-glass-card rounded-2xl p-4 flex flex-col justify-between group cursor-pointer"
-                onClick={() => {
-                  setActiveCategory(mod.category === 'dua-tangan' ? 'dua-tangan' : mod.category);
-                }}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
-                      {mod.badge}
-                    </span>
-                    <span className="text-xs font-semibold text-slate-600 group-hover:text-blue-700 transition-colors tabular-nums">
-                      {mod.count} Isyarat
-                    </span>
-                  </div>
-
-                  <h4 className="font-bold text-slate-900 text-base group-hover:text-blue-700 transition-colors">
-                    {mod.title}
-                  </h4>
-                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed line-clamp-3">
-                    {mod.description}
-                  </p>
-                </div>
-
-                <div className="pt-4 border-t border-slate-200/70 mt-4 flex items-center justify-between">
-                  <div className="flex -space-x-1.5 overflow-hidden">
-                    {mod.highlightSigns.slice(0, 4).map((sId) => (
-                      <div
-                        key={sId}
-                        className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center p-0.5"
-                      >
-                        <HandSignIllustration signId={sId} size={20} />
-                      </div>
-                    ))}
-                  </div>
-
-                  <span className="text-xs font-bold text-blue-700 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                    <span>Buka</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+          return (
+            <div
+              key={mod.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                setSelectedCategory(targetCategory);
+                onSearchChange?.('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedCategory(targetCategory);
+                  onSearchChange?.('');
+                }
+              }}
+              className={`tactile-card rounded-3xl overflow-hidden flex flex-col justify-between cursor-pointer ${
+                isSelected ? 'ring-2 ring-[#1D4ED8] -translate-y-1' : ''
+              }`}
+            >
+              <div>
+                <div
+                  className={`px-5 py-3 border-b-2 border-[#1C1917] flex items-center justify-between ${mod.headerBg}`}
+                >
+                  <span className="font-mono text-xs font-bold uppercase tracking-wider">
+                    {mod.index}
+                  </span>
+                  <span
+                    className={`font-mono text-xs font-bold px-2 py-0.5 rounded border border-[#1C1917] ${mod.badgeBg}`}
+                  >
+                    {mod.count}
                   </span>
                 </div>
+
+                <div className="p-5">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-[#F6F3EC] border-2 border-[#1C1917] flex items-center justify-center shrink-0">
+                      <IconComponent className="w-5 h-5 text-[#141210]" />
+                    </div>
+                    <div>
+                      <h3 className="font-display font-extrabold text-lg text-[#141210] leading-tight">
+                        {mod.title}
+                      </h3>
+                      <p className="font-mono text-xs font-bold text-[#57534E]">{mod.subtitle}</p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-[#44403C] leading-relaxed mt-2">{mod.description}</p>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Sign Vocabulary Cards Grid */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4 text-emerald-600" />
-              <span>Daftar Kosakata &amp; Isyarat ({filteredSigns.length})</span>
-            </h3>
-            {searchQuery && (
-              <span className="text-xs text-slate-600">
-                Mencari: &ldquo;{searchQuery}&rdquo;
-              </span>
-            )}
-          </div>
-
-          {searchQuery && (
-            <button
-              onClick={() => onSearchChange('')}
-              className="text-xs text-blue-700 hover:text-blue-900 font-semibold cursor-pointer"
-            >
-              Reset Pencarian
-            </button>
-          )}
-        </div>
-
-        {filteredSigns.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-            {filteredSigns.map((sign) => (
-              <SignCardVisual
-                key={sign.id}
-                sign={sign}
-                size="sm"
-                onClick={() => setSelectedSign(sign)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="liquid-glass rounded-2xl p-8 text-center space-y-3 max-w-md mx-auto">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-500 mx-auto flex items-center justify-center">
-              <Search className="w-6 h-6" />
+              {/* Preview Chips */}
+              <div className="px-5 pb-4 pt-3 border-t border-[#EAE4D7] bg-[#F6F3EC] flex flex-wrap gap-1.5">
+                {mod.signs.map((sign) => (
+                  <button
+                    key={sign.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveSignDetail(sign);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-[#FFFDF9] hover:bg-[#FDE68A] border border-[#1C1917] text-xs font-bold text-[#141210] transition-colors cursor-pointer"
+                  >
+                    {sign.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div>
-              <p className="font-bold text-slate-900 text-sm">
-                Isyarat tidak ditemukan
-              </p>
-              <p className="text-xs text-slate-600 mt-1">
-                Tidak ada kata atau huruf yang cocok dengan &ldquo;{searchQuery}&rdquo;. Coba kata lain seperti &ldquo;Halo&rdquo; atau &ldquo;B&rdquo;.
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                onSearchChange('');
-                setActiveCategory('all');
-              }}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer"
-            >
-              Tampilkan Semua Kosakata
-            </button>
-          </div>
-        )}
+          );
+        })}
       </div>
 
-      {/* Sign Detail & Practice Modal */}
-      {selectedSign && (
+      {/* Full Dictionary Specimen Vault */}
+      <div className="bg-[#FFFDF9] rounded-3xl border-2 border-[#1C1917] shadow-[6px_6px_0px_#1C1917] overflow-hidden">
+        <div className="bg-[#141210] text-[#FFFDF9] px-6 py-4 border-b-2 border-[#1C1917] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-5 h-5 text-[#FDE68A]" />
+            <h3 className="font-display font-extrabold text-xl text-white">
+              {searchQuery.trim()
+                ? `Hasil Pencarian Kamus: "${searchQuery}"`
+                : 'Galeri Kartu Spesimen SIBI'}
+            </h3>
+          </div>
+          <div className="flex items-center gap-3">
+            {searchQuery.trim() && onSearchChange && (
+              <button
+                type="button"
+                onClick={() => onSearchChange('')}
+                className="px-2.5 py-1 rounded-lg bg-[#FDE68A] text-[#141210] font-mono text-xs font-bold cursor-pointer"
+              >
+                Reset Filter
+              </button>
+            )}
+            <span className="font-mono text-xs font-bold text-[#FDE68A] tabular-nums">
+              MENAMPILKAN {displayedSigns.length} KARTU ISYARAT · KLIK UNTUK DETAIL
+            </span>
+          </div>
+        </div>
+
+        <div className="p-6 flex flex-wrap gap-4 justify-center sm:justify-start">
+          {displayedSigns.map((sign) => (
+            <SignCardVisual
+              key={sign.id}
+              sign={sign}
+              size="sm"
+              highlight={activeSignDetail?.id === sign.id}
+              onClick={() => setActiveSignDetail(sign)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Interactive Sign Detail Modal */}
+      {activeSignDetail && (
         <div
-          id="sign-detail-modal-overlay"
-          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
-          onClick={() => setSelectedSign(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#141210]/60 backdrop-blur-xs"
+          onClick={() => setActiveSignDetail(null)}
         >
           <div
-            id="sign-detail-modal-content"
-            className="liquid-glass-modal rounded-3xl max-w-lg w-full p-6 border border-white/60 space-y-5"
+            className="bg-[#FFFDF9] rounded-3xl max-w-lg w-full overflow-hidden border-2 border-[#1C1917] shadow-[8px_8px_0px_#1C1917] relative"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Top Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white font-mono font-bold text-lg flex items-center justify-center">
-                  {selectedSign.label.length <= 2 ? selectedSign.label : selectedSign.label.charAt(0)}
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg text-slate-900">
-                    Isyarat: {selectedSign.label}
-                  </h3>
-                  <span className="text-xs text-blue-700 font-semibold uppercase tracking-wider">
-                    Kategori {selectedSign.category}
-                  </span>
-                </div>
-              </div>
-
+            {/* Modal Top Strip */}
+            <div className="bg-[#141210] text-[#FFFDF9] px-6 py-4 border-b-2 border-[#1C1917] flex items-center justify-between">
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#FDE68A]">
+                SPESIMEN ISYARAT // {activeSignDetail.category.toUpperCase()}
+              </span>
               <button
-                onClick={() => setSelectedSign(null)}
-                className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+                type="button"
                 aria-label="Tutup detail isyarat"
+                onClick={() => setActiveSignDetail(null)}
+                className="p-1.5 rounded-lg bg-[#292524] hover:bg-[#44403C] text-white cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Illustration Graphic */}
-            <div className="py-4 flex flex-col items-center justify-center">
-              <HandSignIllustration signId={selectedSign.id} size={150} animate={true} />
-              <p className="text-xs font-bold text-slate-700 mt-3 text-center">
-                Bentuk Tangan SIBI: &ldquo;{selectedSign.label}&rdquo;
-              </p>
-            </div>
+            <div className="p-6 flex flex-col items-center text-center">
+              <SignCardVisual sign={activeSignDetail} size="lg" highlight={true} />
 
-            {/* Explanations & Finger Guide */}
-            <div className="space-y-3 text-xs border-t border-slate-200/80 pt-4">
-              <div>
-                <span className="font-bold text-slate-900 block mb-0.5">
-                  Deskripsi Gerakan:
-                </span>
-                <p className="text-slate-700 leading-relaxed">
-                  {selectedSign.description}
-                </p>
+              <div className="mt-6 w-full text-left space-y-3 bg-[#F6F3EC] p-4 rounded-2xl border-2 border-[#1C1917]">
+                <div>
+                  <span className="font-mono text-xs font-bold text-[#57534E] uppercase tracking-wider">
+                    Deskripsi Formasi Tangan:
+                  </span>
+                  <p className="text-sm font-bold text-[#141210] mt-1 leading-relaxed">
+                    {activeSignDetail.description}
+                  </p>
+                </div>
+
+                {activeSignDetail.fingerGuide && (
+                  <div className="pt-2 border-t border-[#D4CBB8] text-xs font-bold text-[#141210]">
+                    <span className="font-mono uppercase text-[#57534E] block">
+                      Posisi Jari:
+                    </span>
+                    {activeSignDetail.fingerGuide}
+                  </div>
+                )}
+
+                {activeSignDetail.motion && (
+                  <div className="pt-2 border-t border-[#D4CBB8] flex items-center gap-2 text-xs font-bold text-[#C2410C]">
+                    <MoveRight className="w-4 h-4 shrink-0" />
+                    <span>Catatan Gerakan: {activeSignDetail.motion}</span>
+                  </div>
+                )}
               </div>
 
-              {selectedSign.fingerGuide && (
-                <div>
-                  <span className="font-bold text-blue-900 block mb-0.5">
-                    Panduan Jari:
-                  </span>
-                  <p className="text-blue-800 leading-relaxed">
-                    {selectedSign.fingerGuide}
-                  </p>
-                </div>
-              )}
-
-              {selectedSign.tips && (
-                <div>
-                  <span className="font-bold text-emerald-900 block mb-0.5">
-                    Tips Kamera &amp; Akurasi:
-                  </span>
-                  <p className="text-emerald-800 leading-relaxed">
-                    {selectedSign.tips}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
-              <button
-                onClick={() => {
-                  onPracticeInCamera(selectedSign);
-                  setSelectedSign(null);
-                }}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors active:scale-98 cursor-pointer"
-              >
-                <Video className="w-4 h-4" />
-                <span>Coba Praktikkan di Kamera</span>
-              </button>
-
-              <button
-                onClick={() => onSpeak(selectedSign.label)}
-                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors cursor-pointer"
-              >
-                <Volume2 className="w-4 h-4" />
-                <span>Bunyikan Suara</span>
-              </button>
+              <div className="mt-5 flex flex-wrap gap-3 w-full">
+                <button
+                  type="button"
+                  onClick={() => speakSign(activeSignDetail.label)}
+                  className="tactile-btn flex-1 py-3 px-4 rounded-xl bg-[#1D4ED8] text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Volume2 className="w-4 h-4" />
+                  <span>Dengarkan Pengucapan</span>
+                </button>
+                {onPracticeInCamera && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const signToPractice = activeSignDetail;
+                      setActiveSignDetail(null);
+                      onPracticeInCamera(signToPractice);
+                    }}
+                    className="tactile-btn flex-1 py-3 px-4 rounded-xl bg-[#047857] text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Praktikkan di Kamera</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

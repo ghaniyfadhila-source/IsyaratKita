@@ -1,162 +1,156 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SibiSign } from '../types';
-import { SIBI_ALPHABET, SIBI_COMMON_WORDS, QUICK_SAMPLE_PHRASES } from '../data/sibiData';
-import { HandSignIllustration } from './HandSignIllustration';
 import {
   Mic,
   MicOff,
   Play,
   Pause,
   RotateCcw,
-  SkipForward,
-  SkipBack,
-  Sparkles,
-  Info,
-  Layers,
   Volume2,
-  MoveRight,
-  Lightbulb
+  Sparkles,
+  AlertCircle,
+  ChevronRight,
+  ChevronLeft,
+  Gauge,
+  Info,
+  Trash2,
 } from 'lucide-react';
+import { SibiSign } from '../types';
+import { SIBI_ALPHABET, SIBI_COMMON_WORDS, QUICK_SAMPLE_PHRASES } from '../data/sibiData';
+import { SignCardVisual } from './SignCardVisual';
 
 interface SpeechToSignViewProps {
   soundEnabled: boolean;
   onLogTranslation?: (sourceText: string, translatedResult: string) => void;
 }
 
-export const SpeechToSignView: React.FC<SpeechToSignViewProps> = ({
-  soundEnabled,
-  onLogTranslation
-}) => {
-  const [inputText, setInputText] = useState('Halo kawan');
-  const [signQueue, setSignQueue] = useState<SibiSign[]>([]);
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
-  const [isListening, setIsListening] = useState<boolean>(false);
-  const [speechSupported, setSpeechSupported] = useState<boolean>(true);
-  const timerRef = useRef<number | null>(null);
+function buildSignSequence(text: string): { sign: SibiSign; sourceWord: string }[] {
+  const cleaned = text.trim();
+  if (!cleaned) return [];
 
-  useEffect(() => {
-    const SpeechRecognition =
-      (window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown })
-        .SpeechRecognition ||
-      (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setSpeechSupported(false);
+  const lowerFull = cleaned.toLowerCase();
+  const result: { sign: SibiSign; sourceWord: string }[] = [];
+
+  // Normalize multi-word phrases first
+  const tokens = lowerFull
+    .replace(/[^a-zA-Z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+
+  let i = 0;
+  while (i < tokens.length) {
+    const twoWord = i + 1 < tokens.length ? `${tokens[i]} ${tokens[i + 1]}` : '';
+    if (twoWord === 'terima kasih') {
+      const found = SIBI_COMMON_WORDS.find((w) => w.id === 'terima-kasih');
+      if (found) {
+        result.push({ sign: found, sourceWord: 'Terima Kasih' });
+        i += 2;
+        continue;
+      }
     }
-  }, []);
+    if (twoWord === 'sama sama') {
+      const found = SIBI_COMMON_WORDS.find((w) => w.id === 'sama-sama');
+      if (found) {
+        result.push({ sign: found, sourceWord: 'Sama-sama' });
+        i += 2;
+        continue;
+      }
+    }
+    if (twoWord === 'apa kabar' || twoWord === 'kabar baik') {
+      const found = SIBI_COMMON_WORDS.find((w) => w.id === 'kabar-baik');
+      if (found) {
+        result.push({ sign: found, sourceWord: twoWord });
+        i += 2;
+        continue;
+      }
+    }
 
-  const parseTextToSigns = (text: string): SibiSign[] => {
-    const cleanText = text.trim();
-    if (!cleanText) return [];
+    const word = tokens[i];
+    const matchedCommon = SIBI_COMMON_WORDS.find(
+      (w) =>
+        w.id === word ||
+        w.label.toLowerCase() === word ||
+        w.label.toLowerCase().split(/\s*\/\s*/).includes(word)
+    );
 
-    const words = cleanText.toLowerCase().split(/\s+/);
-    const result: SibiSign[] = [];
-
-    words.forEach((word) => {
-      const sanitized = word.replace(/[^a-z0-9]/gi, '');
-      if (!sanitized) return;
-
-      const matchedWord = SIBI_COMMON_WORDS.find(
-        (w) =>
-          w.id.toLowerCase() === sanitized ||
-          w.label.toLowerCase().includes(sanitized)
-      );
-
-      if (matchedWord) {
-        result.push(matchedWord);
-      } else {
-        for (const char of sanitized) {
-          const letterSign = SIBI_ALPHABET.find(
-            (s) => s.label.toLowerCase() === char.toLowerCase()
-          );
-          if (letterSign) {
-            result.push(letterSign);
-          }
+    if (matchedCommon) {
+      result.push({ sign: matchedCommon, sourceWord: word });
+    } else {
+      for (const ch of word) {
+        const letterSign = SIBI_ALPHABET.find((a) => a.id === ch.toLowerCase());
+        if (letterSign) {
+          result.push({ sign: letterSign, sourceWord: word });
         }
       }
-    });
+    }
+    i++;
+  }
 
-    return result;
-  };
+  return result;
+}
+
+export const SpeechToSignView: React.FC<SpeechToSignViewProps> = ({
+  soundEnabled,
+  onLogTranslation,
+}) => {
+  const [inputText, setInputText] = useState('Halo terima kasih');
+  const [isListening, setIsListening] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const [flatSigns, setFlatSigns] = useState<{ sign: SibiSign; sourceWord: string }[]>([]);
+  const [activeIndex, setActiveIndex] = useState<number>(0);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<'slow' | 'normal' | 'fast'>('normal');
+
+  const recognitionRef = useRef<any>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const speedMs = {
+    slow: 2000,
+    normal: 1200,
+    fast: 650,
+  }[playbackSpeed];
 
   useEffect(() => {
-    const signs = parseTextToSigns(inputText);
-    setSignQueue(signs);
-    setCurrentIndex(0);
+    const seq = buildSignSequence(inputText);
+    setFlatSigns(seq);
+    setActiveIndex(0);
     setIsPlaying(false);
   }, [inputText]);
 
   useEffect(() => {
-    if (isPlaying && signQueue.length > 0) {
-      const intervalTime = Math.max(500, Math.floor(1500 / playbackSpeed));
-      timerRef.current = window.setInterval(() => {
-        setCurrentIndex((prev) => {
-          if (prev >= signQueue.length - 1) {
+    if (isPlaying && flatSigns.length > 0) {
+      timerRef.current = setInterval(() => {
+        setActiveIndex((prev) => {
+          if (prev + 1 < flatSigns.length) {
+            return prev + 1;
+          } else {
             setIsPlaying(false);
             return prev;
           }
-          return prev + 1;
         });
-      }, intervalTime);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
+      }, speedMs);
+    } else if (timerRef.current) {
+      clearInterval(timerRef.current);
     }
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isPlaying, signQueue.length, playbackSpeed]);
+  }, [isPlaying, flatSigns, speedMs]);
 
-  const handleTogglePlay = () => {
-    if (signQueue.length === 0) return;
-    if (currentIndex >= signQueue.length - 1) {
-      setCurrentIndex(0);
-      setIsPlaying(true);
-    } else {
-      setIsPlaying(!isPlaying);
-    }
-    if (!isPlaying && onLogTranslation && inputText.trim()) {
-      const summarySigns = signQueue.map((s) => s.label).join(' ');
-      onLogTranslation(inputText, `[${signQueue.length} Isyarat SIBI: ${summarySigns}]`);
-    }
-  };
+  const toggleMicrophone = () => {
+    setSpeechError(null);
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-  const handleRestart = () => {
-    setCurrentIndex(0);
-    setIsPlaying(true);
-    if (onLogTranslation && inputText.trim()) {
-      const summarySigns = signQueue.map((s) => s.label).join(' ');
-      onLogTranslation(inputText, `[${signQueue.length} Isyarat SIBI: ${summarySigns}]`);
-    }
-  };
-
-  const handleNext = () => {
-    if (currentIndex < signQueue.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    }
-  };
-
-  const handlePrev = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-    }
-  };
-
-  const handleToggleMic = () => {
-    if (!speechSupported) {
-      alert('Browser ini belum mendukung Web Speech Recognition. Anda tetap dapat mengetik teks langsung.');
+    if (!SpeechRecognition) {
+      setSpeechError(
+        'Browser Anda belum mendukung Web Speech API. Gunakan Google Chrome atau Microsoft Edge, atau ketik kalimat secara manual.'
+      );
       return;
     }
 
-    const SpeechRecognition =
-      (window as unknown as { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any })
-        .SpeechRecognition ||
-      (window as unknown as { webkitSpeechRecognition?: new () => any }).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) return;
-
     if (isListening) {
+      recognitionRef.current?.stop();
       setIsListening(false);
       return;
     }
@@ -165,141 +159,192 @@ export const SpeechToSignView: React.FC<SpeechToSignViewProps> = ({
       const recognition = new SpeechRecognition();
       recognition.lang = 'id-ID';
       recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.interimResults = true;
 
       recognition.onstart = () => {
         setIsListening(true);
       };
 
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
+        let transcript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
         setInputText(transcript);
-        setIsListening(false);
       };
 
-      recognition.onerror = () => {
+      recognition.onerror = (event: any) => {
         setIsListening(false);
+        if (event.error === 'not-allowed') {
+          setSpeechError('Izin mikrofon ditolak. Mohon izinkan akses mikrofon di browser Anda.');
+        } else {
+          setSpeechError(`Gagal menangkap suara (${event.error}). Silakan coba lagi.`);
+        }
       };
 
       recognition.onend = () => {
         setIsListening(false);
+        setIsPlaying(true);
       };
 
+      recognitionRef.current = recognition;
       recognition.start();
-    } catch (e) {
-      console.error('Speech recognition error:', e);
+    } catch {
+      setSpeechError('Terjadi kendala saat mengaktifkan mikrofon.');
       setIsListening(false);
     }
   };
 
   const speakCurrentText = () => {
-    if (!soundEnabled || !inputText) return;
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(inputText);
-      utterance.lang = 'id-ID';
-      window.speechSynthesis.speak(utterance);
-    }
+    if (!soundEnabled || !('speechSynthesis' in window) || !inputText.trim()) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(inputText);
+    utterance.lang = 'id-ID';
+    utterance.rate = 0.95;
+    window.speechSynthesis.speak(utterance);
   };
 
-  const currentSign = signQueue[currentIndex];
+  const quickPhrases = [
+    ...QUICK_SAMPLE_PHRASES,
+    'Perkenalkan saya Budi',
+    'Sama-sama',
+    'Sayang',
+  ];
+
+  const currentItem = flatSigns[activeIndex];
 
   return (
-    <div id="speech-to-sign-section" className="space-y-6 max-w-5xl mx-auto">
-      {/* Direction Information Header */}
-      <div className="liquid-glass rounded-3xl p-5 border border-slate-200/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-bold text-slate-900">
-            Ubah Suara &amp; Tulisan Menjadi Gerakan Isyarat
-          </h3>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            Ucapkan kata lewat mikrofon atau ketik kalimat Anda. Sistem akan menampilkan panduan gerakan tangan SIBI secara berurutan.
-          </p>
-        </div>
-
-        {/* Quick Speak Button */}
-        <button
-          id="btn-speak-input-text"
-          onClick={speakCurrentText}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition-colors cursor-pointer shrink-0"
-          title="Dengarkan pengucapan teks"
-        >
-          <Volume2 className="w-4 h-4 text-blue-600" />
-          <span>Dengarkan Suara</span>
-        </button>
-      </div>
-
-      {/* Main Two-Column Layout */}
+    <div id="speech-to-sign-section" className="w-full">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Input & Transcript Panel */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="liquid-glass rounded-3xl p-5 border border-slate-200/90 space-y-4">
-            <label
-              htmlFor="speech-input-field"
-              className="block text-sm font-bold text-slate-900"
+        {/* Left Column (5 Cols): Editorial Transcription & Input Desk */}
+        <div className="lg:col-span-5 bg-[#FFFDF9] rounded-3xl border-2 border-[#1C1917] shadow-[6px_6px_0px_#1C1917] overflow-hidden flex flex-col justify-between">
+          {/* Top Bar */}
+          <div className="bg-[#1D4ED8] text-white px-6 py-4 border-b-2 border-[#1C1917] flex items-center justify-between">
+            <div>
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#DBEAFE] block">
+                STUDIO 01 // INPUT UCAPAN &amp; TEKS
+              </span>
+              <h3 className="font-display font-extrabold text-lg sm:text-xl text-white">
+                Meja Transkripsi Bahasa Indonesia
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={speakCurrentText}
+              title="Dengarkan Teks (Text-to-Speech)"
+              className="tactile-btn p-2.5 rounded-xl bg-[#FFFDF9] text-[#141210] hover:bg-[#FDE68A] cursor-pointer"
             >
-              Ketik Kalimat atau Mulai Bicara
-            </label>
+              <Volume2 className="w-5 h-5 text-[#1D4ED8]" />
+            </button>
+          </div>
 
-            <div className="relative">
+          <div className="p-6 space-y-5">
+            {/* Textarea Composition Pad */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label
+                  htmlFor="speech-to-sign-textarea"
+                  className="font-mono text-xs font-bold uppercase tracking-wider text-[#141210]"
+                >
+                  Kalimat yang Akan Diterjemahkan
+                </label>
+                {inputText && (
+                  <button
+                    type="button"
+                    onClick={() => setInputText('')}
+                    className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-[#EAE4D7] text-[#141210] hover:bg-[#FDE68A] border border-[#1C1917] transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Bersihkan</span>
+                  </button>
+                )}
+              </div>
+
               <textarea
-                id="speech-input-field"
-                rows={3}
+                id="speech-to-sign-textarea"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="Ketik kalimat di sini atau gunakan tombol mikrofon di bawah..."
-                className="w-full rounded-2xl border border-slate-200 bg-white/95 p-3 pr-16 text-xs sm:text-sm text-slate-900 placeholder:text-slate-600 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 resize-none transition-all font-medium"
+                placeholder="Ketik kalimat atau tekan tombol Rekam Suara di bawah..."
+                rows={4}
+                className="w-full rounded-2xl p-4 bg-[#F6F3EC] border-2 border-[#1C1917] text-[#141210] placeholder:text-[#57534E] font-bold text-base sm:text-lg focus:outline-none focus:bg-white transition-colors resize-none"
               />
-              {inputText && (
-                <button
-                  onClick={() => setInputText('')}
-                  className="absolute top-2.5 right-2.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-                >
-                  Hapus
-                </button>
-              )}
             </div>
 
-            {/* Input Action Controls */}
-            <div className="flex items-center justify-between gap-2 pt-1">
+            {/* Primary Voice Record & Translate Controls */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <button
-                id="btn-toggle-mic"
-                onClick={handleToggleMic}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-98 cursor-pointer ${
+                id="btn-voice-record"
+                type="button"
+                onClick={toggleMicrophone}
+                className={`tactile-btn flex-1 py-3.5 px-5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2.5 cursor-pointer ${
                   isListening
-                    ? 'bg-rose-600 text-white'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    ? 'bg-[#DC2626] text-white'
+                    : 'bg-[#1D4ED8] hover:bg-[#1E40AF] text-white'
                 }`}
               >
                 {isListening ? (
                   <>
+                    <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
                     <MicOff className="w-4 h-4" />
-                    <span>Mendengarkan...</span>
+                    <span>Mendengarkan... (Klik Berhenti)</span>
                   </>
                 ) : (
                   <>
                     <Mic className="w-4 h-4" />
-                    <span>Mulai Bicara (Mikrofon)</span>
+                    <span>Mulai Rekam Suara (ID)</span>
                   </>
                 )}
               </button>
 
-              <span className="text-xs font-semibold text-slate-600 tabular-nums">
-                {signQueue.length} isyarat tangan
-              </span>
+              <button
+                id="btn-play-signs"
+                type="button"
+                onClick={() => {
+                  setActiveIndex(0);
+                  setIsPlaying(true);
+                  if (inputText.trim() && flatSigns.length > 0 && onLogTranslation) {
+                    onLogTranslation(
+                      inputText.trim(),
+                      flatSigns.map((f) => f.sign.label).join(' → ')
+                    );
+                  }
+                }}
+                disabled={flatSigns.length === 0}
+                className="tactile-btn py-3.5 px-5 rounded-2xl font-bold text-sm bg-[#FDE68A] hover:bg-[#FCD34D] text-[#141210] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>Putar Peragaan</span>
+              </button>
             </div>
 
-            {/* Quick Sample Chips */}
-            <div className="pt-3 border-t border-slate-200/70">
-              <span className="text-xs font-semibold text-slate-600 mb-2 block">
-                Pilihan Kalimat Cepat:
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {QUICK_SAMPLE_PHRASES.map((phrase, idx) => (
+            {speechError && (
+              <div className="p-3.5 rounded-xl bg-[#FEE2E2] border-2 border-[#1C1917] flex items-start gap-2.5 text-xs text-[#991B1B] font-bold">
+                <AlertCircle className="w-4 h-4 text-[#DC2626] shrink-0 mt-0.5" />
+                <span>{speechError}</span>
+              </div>
+            )}
+
+            {/* Quick Phrases Keycaps */}
+            <div className="pt-4 border-t-2 border-[#EAE4D7]">
+              <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-[#44403C] uppercase tracking-wider mb-3">
+                <Sparkles className="w-3.5 h-3.5 text-[#C2410C]" />
+                <span>Frasa Instan SIBI (Klik untuk Uji):</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {quickPhrases.map((phrase) => (
                   <button
-                    key={idx}
-                    onClick={() => setInputText(phrase)}
-                    className="px-2.5 py-1 text-xs bg-white hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 border border-slate-200 rounded-lg text-slate-700 transition-colors cursor-pointer"
+                    key={phrase}
+                    type="button"
+                    onClick={() => {
+                      setInputText(phrase);
+                      setActiveIndex(0);
+                      setIsPlaying(true);
+                    }}
+                    className={`tactile-btn text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer ${
+                      inputText.toLowerCase() === phrase.toLowerCase()
+                        ? 'bg-[#141210] text-[#FDE68A]'
+                        : 'bg-[#F6F3EC] hover:bg-[#FDE68A] text-[#141210]'
+                    }`}
                   >
                     {phrase}
                   </button>
@@ -307,220 +352,217 @@ export const SpeechToSignView: React.FC<SpeechToSignViewProps> = ({
               </div>
             </div>
           </div>
-
-          {/* SIBI Grammar Hint */}
-          <div className="liquid-glass rounded-2xl p-4 border border-slate-200/80 text-xs text-slate-600 space-y-1.5">
-            <div className="flex items-center gap-1.5 font-bold text-slate-900">
-              <Info className="w-4 h-4 text-blue-600" />
-              <span>Informasi SIBI</span>
-            </div>
-            <p className="text-slate-600 leading-relaxed">
-              Kata yang sering digunakan (seperti <em>Halo, Terima Kasih, Maaf, Tolong</em>) memiliki isyarat khusus satu kata utuh. Sedangkan kata lainnya diperagakan dengan mengeja huruf demi huruf (A–Z).
-            </p>
-          </div>
         </div>
 
-        {/* Right Column: Interactive Sign Visualizer Stage (flattened hierarchy, no nested cards) */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="liquid-glass rounded-3xl p-6 border border-slate-200/90 flex flex-col justify-between min-h-[440px]">
-            {/* Visualizer Stage Top Bar */}
-            <div className="w-full flex items-center justify-between border-b border-slate-200/80 pb-3.5">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-bold text-slate-900">
-                  Peragaan Gerakan Tangan
-                </span>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-slate-600 tabular-nums">
-                <span>Gerakan:</span>
-                <span className="font-bold text-blue-700">
-                  {signQueue.length > 0 ? currentIndex + 1 : 0}
-                </span>
-                <span>/ {signQueue.length}</span>
-              </div>
+        {/* Right Column (7 Cols): High-Clarity SIBI Specimen Stage */}
+        <div className="lg:col-span-7 bg-[#FFFDF9] rounded-3xl border-2 border-[#1C1917] shadow-[6px_6px_0px_#1C1917] overflow-hidden flex flex-col justify-between min-h-[520px]">
+          {/* Stage Top Control Deck */}
+          <div className="bg-[#141210] text-[#FFFDF9] px-6 py-4 border-b-2 border-[#1C1917] flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#FDE68A] block">
+                PANGGUNG VISUALISASI SIBI
+              </span>
+              <p className="font-mono text-xs text-[#D6D3D1] tabular-nums mt-0.5">
+                {flatSigns.length > 0
+                  ? `KARTU ${(activeIndex + 1).toString().padStart(2, '0')} DARI ${flatSigns.length.toString().padStart(2, '0')} · KATA ASAL: "${currentItem?.sourceWord.toUpperCase()}"`
+                  : 'MENUNGGU INPUT TEKS ATAU SUARA'}
+              </p>
             </div>
 
-            {/* Central Stage: Active Sign Display (clean divided sections without nested card borders) */}
-            <div className="my-5 w-full flex flex-col items-center justify-center">
-              {currentSign ? (
-                <div className="w-full space-y-5">
-                  {/* Top visual stage */}
-                  <div className="flex flex-col items-center text-center">
-                    <div className="w-full max-w-sm flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 uppercase tracking-wider">
-                        {currentSign.category}
-                      </span>
-                      <span className="text-xs font-mono font-bold text-blue-800 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200 tabular-nums">
-                        #{currentIndex + 1}
-                      </span>
-                    </div>
+            {flatSigns.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Speed Selector */}
+                <div className="flex items-center bg-[#292524] p-1 rounded-xl border border-[#44403C]">
+                  <Gauge className="w-3.5 h-3.5 text-[#A8A29E] ml-1.5 mr-1" />
+                  {(['slow', 'normal', 'fast'] as const).map((spd) => (
+                    <button
+                      key={spd}
+                      type="button"
+                      onClick={() => setPlaybackSpeed(spd)}
+                      className={`px-2 py-1 rounded-lg font-mono text-xs font-bold transition-all cursor-pointer ${
+                        playbackSpeed === spd
+                          ? 'bg-[#FDE68A] text-[#141210]'
+                          : 'text-[#D6D3D1] hover:text-white'
+                      }`}
+                    >
+                      {spd === 'slow' ? '0.5x' : spd === 'normal' ? '1x' : '2x'}
+                    </button>
+                  ))}
+                </div>
 
-                    <div className="relative flex items-center justify-center py-2">
-                      <HandSignIllustration
-                        signId={currentSign.id}
-                        size={148}
-                        animate={true}
-                      />
-                    </div>
+                {/* Transport Controls */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    aria-label="Isyarat sebelumnya"
+                    onClick={() => {
+                      setIsPlaying(false);
+                      setActiveIndex((prev) => Math.max(0, prev - 1));
+                    }}
+                    disabled={activeIndex === 0}
+                    className="p-2 rounded-xl bg-[#292524] hover:bg-[#44403C] disabled:opacity-40 text-white border border-[#44403C] cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
 
-                    {currentSign.motion && (
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 text-xs font-semibold border border-emerald-200 mt-1">
-                        <MoveRight className="w-3.5 h-3.5 text-emerald-700" />
-                        <span>Arah: {currentSign.motion}</span>
-                      </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isPlaying && activeIndex === flatSigns.length - 1) {
+                        setActiveIndex(0);
+                      }
+                      setIsPlaying(!isPlaying);
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1D4ED8] hover:bg-[#2563EB] text-white font-bold text-xs border border-white/20 cursor-pointer"
+                  >
+                    {isPlaying ? (
+                      <Pause className="w-3.5 h-3.5" />
+                    ) : (
+                      <Play className="w-3.5 h-3.5" />
                     )}
+                    <span>{isPlaying ? 'Jeda' : 'Putar'}</span>
+                  </button>
 
-                    <p className="font-extrabold text-xl sm:text-2xl text-slate-900 mt-2">
-                      {currentSign.label}
+                  <button
+                    type="button"
+                    aria-label="Ulangi dari awal"
+                    onClick={() => {
+                      setIsPlaying(false);
+                      setActiveIndex(0);
+                    }}
+                    className="p-2 rounded-xl bg-[#292524] hover:bg-[#44403C] text-white border border-[#44403C] cursor-pointer"
+                    title="Ulangi dari awal"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    aria-label="Isyarat berikutnya"
+                    onClick={() => {
+                      setIsPlaying(false);
+                      setActiveIndex((prev) => Math.min(flatSigns.length - 1, prev + 1));
+                    }}
+                    disabled={activeIndex === flatSigns.length - 1}
+                    className="p-2 rounded-xl bg-[#292524] hover:bg-[#44403C] disabled:opacity-40 text-white border border-[#44403C] cursor-pointer"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Stage Center Display */}
+          {flatSigns.length > 0 && currentItem ? (
+            <div className="p-6 flex-1 flex flex-col justify-between gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center bg-[#F6F3EC] rounded-2xl p-5 border-2 border-[#1C1917]">
+                {/* Highlighted Sign Card */}
+                <div className="md:col-span-5 flex justify-center">
+                  <SignCardVisual sign={currentItem.sign} size="lg" highlight={true} />
+                </div>
+
+                {/* Anatomical Guide & Context */}
+                <div className="md:col-span-7 space-y-4 text-left">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-xs font-bold uppercase px-2.5 py-1 rounded bg-[#141210] text-[#FDE68A] tabular-nums">
+                      LANGKAH {(activeIndex + 1).toString().padStart(2, '0')} /{' '}
+                      {flatSigns.length.toString().padStart(2, '0')}
+                    </span>
+                    <span className="font-mono text-xs font-bold uppercase px-2.5 py-1 rounded bg-[#DBEAFE] text-[#1E3A8A] border border-[#1C1917]">
+                      Kata: “{currentItem.sourceWord}”
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="font-display text-3xl sm:text-4xl font-extrabold text-[#141210] tracking-tight">
+                      Isyarat “{currentItem.sign.label}”
+                    </h4>
+                    <p className="text-sm sm:text-base text-[#44403C] mt-2 leading-relaxed font-medium">
+                      {currentItem.sign.description}
                     </p>
                   </div>
 
-                  {/* Instruction details separated by clean hairline divider */}
-                  <div className="pt-4 border-t border-slate-200/80 text-left w-full space-y-2.5">
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 block">
-                        Cara Melakukan Gerakan:
+                  {currentItem.sign.fingerGuide && (
+                    <div className="p-3 rounded-xl bg-[#FFFDF9] border border-[#1C1917] text-xs font-bold text-[#141210]">
+                      <span className="font-mono uppercase text-[#57534E] block mb-0.5">
+                        Panduan Jari:
                       </span>
-                      <p className="text-xs sm:text-sm text-slate-700 mt-0.5 leading-relaxed">
-                        {currentSign.description}
-                      </p>
+                      {currentItem.sign.fingerGuide}
                     </div>
+                  )}
 
-                    {currentSign.fingerGuide && (
-                      <div className="flex items-start gap-2 text-xs text-blue-900 pt-1">
-                        <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                        <span>
-                          <strong>Bentuk Jari:</strong> {currentSign.fingerGuide}
-                        </span>
-                      </div>
-                    )}
+                  {currentItem.sign.motion && (
+                    <div className="p-3.5 rounded-xl bg-[#FDE68A] border-2 border-[#1C1917] flex items-center gap-2.5 text-xs sm:text-sm font-bold text-[#141210]">
+                      <Info className="w-4 h-4 text-[#C2410C] shrink-0" />
+                      <span>Gerakan: {currentItem.sign.motion}</span>
+                    </div>
+                  )}
 
-                    {currentSign.tips && (
-                      <div className="flex items-start gap-2 text-xs text-emerald-900 pt-0.5">
-                        <Lightbulb className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span>
-                          <strong>Tips Latihan:</strong> {currentSign.tips}
-                        </span>
-                      </div>
-                    )}
+                  {/* Progress Bar */}
+                  <div className="pt-1">
+                    <div className="w-full h-2.5 bg-[#EAE4D7] rounded-full overflow-hidden border border-[#1C1917]">
+                      <div
+                        className="h-full bg-[#1D4ED8] transition-all duration-300"
+                        style={{
+                          width: `${((activeIndex + 1) / flatSigns.length) * 100}%`,
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div className="text-center py-12 text-slate-600 space-y-2">
-                  <Sparkles className="w-8 h-8 mx-auto text-slate-400" />
-                  <p className="text-sm font-semibold text-slate-800">Belum ada kalimat yang dimasukkan</p>
-                  <p className="text-xs text-slate-600">Ketik kalimat atau tekan tombol mikrofon di sebelah kiri.</p>
+              </div>
+
+              {/* Bottom Filmstrip: Full Sign Sequence */}
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="font-mono text-xs font-bold text-[#141210] uppercase tracking-wider">
+                    Urutan Rangkaian Isyarat (Klik Kartu untuk Lompat):
+                  </span>
+                  <span className="font-mono text-xs font-bold text-[#57534E] tabular-nums">
+                    {flatSigns.length} Gestur
+                  </span>
                 </div>
-              )}
-            </div>
-
-            {/* Playback Controls Toolbar */}
-            <div className="w-full pt-4 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-1.5">
-                <button
-                  id="btn-playback-restart"
-                  onClick={handleRestart}
-                  disabled={signQueue.length === 0}
-                  className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-40 transition-colors cursor-pointer"
-                  title="Ulangi dari awal"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </button>
-                <button
-                  id="btn-playback-prev"
-                  onClick={handlePrev}
-                  disabled={currentIndex === 0 || signQueue.length === 0}
-                  className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-40 transition-colors cursor-pointer"
-                  title="Gerakan Sebelumnya"
-                >
-                  <SkipBack className="w-4 h-4" />
-                </button>
-                <button
-                  id="btn-playback-toggle"
-                  onClick={handleTogglePlay}
-                  disabled={signQueue.length === 0}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 disabled:opacity-40 transition-all active:scale-98 cursor-pointer"
-                >
-                  {isPlaying ? (
-                    <>
-                      <Pause className="w-4 h-4" />
-                      <span>Jeda</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4" />
-                      <span>Putar Gerakan</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  id="btn-playback-next"
-                  onClick={handleNext}
-                  disabled={currentIndex >= signQueue.length - 1 || signQueue.length === 0}
-                  className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-40 transition-colors cursor-pointer"
-                  title="Gerakan Berikutnya"
-                >
-                  <SkipForward className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Speed Selector */}
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-slate-600 font-medium">Kecepatan:</span>
-                {[0.5, 1, 1.5].map((speed) => (
-                  <button
-                    key={speed}
-                    onClick={() => setPlaybackSpeed(speed)}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer tabular-nums ${
-                      playbackSpeed === speed
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    {speed}x
-                  </button>
-                ))}
+                <div className="flex items-center gap-2.5 overflow-x-auto pb-2 pt-1 custom-scrollbar">
+                  {flatSigns.map((item, idx) => (
+                    <button
+                      key={`${item.sign.id}-${idx}`}
+                      type="button"
+                      onClick={() => {
+                        setIsPlaying(false);
+                        setActiveIndex(idx);
+                      }}
+                      className={`tactile-btn shrink-0 px-3.5 py-2 rounded-xl flex items-center gap-2 text-xs font-bold cursor-pointer ${
+                        idx === activeIndex
+                          ? 'bg-[#1D4ED8] text-white'
+                          : 'bg-[#F6F3EC] text-[#141210] hover:bg-[#FDE68A]'
+                      }`}
+                    >
+                      <span
+                        className={`font-mono text-xs font-bold tabular-nums ${
+                          idx === activeIndex ? 'text-[#FDE68A]' : 'text-[#57534E]'
+                        }`}
+                      >
+                        {(idx + 1).toString().padStart(2, '0')}
+                      </span>
+                      <span>{item.sign.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Sequence Timeline Strip */}
-          {signQueue.length > 0 && (
-            <div className="liquid-glass rounded-2xl p-4 border border-slate-200/90">
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-xs font-bold text-slate-900">
-                  Daftar Urutan Gerakan ({signQueue.length})
-                </span>
-                <span className="text-xs text-slate-600">
-                  Pilih item untuk melihat detail isyarat
-                </span>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-10">
+              <div className="w-16 h-16 rounded-2xl bg-[#F6F3EC] border-2 border-[#1C1917] shadow-[3px_3px_0px_#1C1917] flex items-center justify-center mb-4">
+                <Sparkles className="w-8 h-8 text-[#1D4ED8]" />
               </div>
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                {signQueue.map((sign, idx) => (
-                  <button
-                    key={`${sign.id}-${idx}`}
-                    onClick={() => {
-                      setCurrentIndex(idx);
-                      setIsPlaying(false);
-                    }}
-                    className={`shrink-0 w-16 h-22 rounded-2xl p-1.5 flex flex-col items-center justify-between text-xs border transition-all cursor-pointer ${
-                      currentIndex === idx
-                        ? 'bg-white text-blue-900 border-blue-600 ring-2 ring-blue-500/30 scale-105'
-                        : 'bg-white/90 text-slate-700 border-slate-200 hover:border-blue-300'
-                    }`}
-                  >
-                    <span className="text-xs font-bold text-slate-600 tabular-nums">
-                      #{idx + 1}
-                    </span>
-                    <div className="w-8 h-8 flex items-center justify-center pointer-events-none">
-                      <HandSignIllustration signId={sign.id} size={30} />
-                    </div>
-                    <span className="text-xs font-mono font-bold text-slate-900 line-clamp-1">
-                      {sign.label.length <= 2 ? sign.label : sign.label.charAt(0)}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <h4 className="font-display font-extrabold text-xl text-[#141210]">
+                Belum Ada Kalimat untuk Diterjemahkan
+              </h4>
+              <p className="text-sm text-[#44403C] max-w-sm mt-1">
+                Ketik kalimat Bahasa Indonesia atau gunakan mikrofon di panel kiri untuk melihat
+                visualisasi kartu isyarat SIBI.
+              </p>
             </div>
           )}
         </div>

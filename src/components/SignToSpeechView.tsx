@@ -682,119 +682,126 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
   const isTwoHandDetectedWord = ['Terima Kasih', 'Sama-sama', 'Tolong', 'Perkenalkan'].includes(detectedLetter);
 
   return (
-    <div id="sign-to-speech-section" className="space-y-6 max-w-7xl mx-auto">
-      {/* Header Info */}
-      <div className="liquid-glass rounded-3xl p-5 border border-slate-200/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-bold text-slate-900">
-            Terjemahkan Isyarat Tangan ke Suara &amp; Tulisan
-          </h3>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            Arahkan tangan ke kamera untuk memperagakan isyarat SIBI. Aplikasi akan membaca gerakan tangan Anda, merangkainya menjadi kata, dan membacakannya bersuara.
-          </p>
+    <div id="sign-to-speech-section" className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-14">
+      {/* Studio Masthead & Filter Control Deck */}
+      <div className="bg-[#FFFDF9] rounded-3xl border-2 border-[#1C1917] shadow-[6px_6px_0px_#1C1917] overflow-hidden">
+        <div className="bg-[#047857] text-white px-6 py-4 border-b-2 border-[#1C1917] flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#D1FAE5] block">
+              STUDIO 02 // DETEKSI KAMERA MEDIAPIPE 1 &amp; 2 TANGAN
+            </span>
+            <h3 className="font-display text-xl sm:text-2xl font-extrabold text-white">
+              Kamera Isyarat SIBI ke Suara &amp; Kalimat
+            </h3>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+            <button
+              id="btn-toggle-camera"
+              type="button"
+              onClick={handleToggleCamera}
+              disabled={isModelLoading}
+              className={`tactile-btn inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold cursor-pointer ${
+                cameraActive
+                  ? 'bg-[#DC2626] hover:bg-[#B91C1C] text-white'
+                  : 'bg-[#FDE68A] hover:bg-[#FCD34D] text-[#141210]'
+              }`}
+            >
+              {isModelLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Menyiapkan Kamera...</span>
+                </>
+              ) : cameraActive ? (
+                <>
+                  <CameraOff className="w-4 h-4" />
+                  <span>Matikan Kamera</span>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-4 h-4" />
+                  <span>Aktifkan Kamera Sekarang</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* Action Controls in Header */}
-        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
-          <button
-            id="btn-toggle-camera"
-            onClick={handleToggleCamera}
-            disabled={isModelLoading}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-98 cursor-pointer ${
-              cameraActive
-                ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
-            }`}
-          >
-            {isModelLoading ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Menyiapkan Kamera...</span>
-              </>
-            ) : cameraActive ? (
-              <>
-                <CameraOff className="w-4 h-4" />
-                <span>Tutup Kamera</span>
-              </>
-            ) : (
-              <>
-                <Camera className="w-4 h-4" />
-                <span>Buka Kamera</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+        {/* Mode Pengenalan Isyarat Selector Bar */}
+        <div className="px-6 py-3.5 bg-[#F6F3EC] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Sliders className="w-4 h-4 text-[#047857] shrink-0" />
+            <span className="font-mono text-xs font-bold uppercase text-[#141210]">
+              Fokus Pengenalan:
+            </span>
+            <span className="text-xs font-medium text-[#44403C] hidden md:inline">
+              {detectionFilterMode === 'alphabet'
+                ? 'Fokus Alfabet (A–Z) — 24 huruf statis + huruf dinamis J & Z.'
+                : detectionFilterMode === 'all'
+                ? 'Otomatis — Alfabet A–Z, kata 1 & 2 tangan, serta gestur dinamis.'
+                : 'Kata & Sapaan — Memprioritaskan kosakata utuh dan sapaan.'}
+            </span>
+          </div>
 
-      {/* Mode Pengenalan Isyarat Selector */}
-      <div className="liquid-glass rounded-2xl p-3 px-4 border border-slate-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Sliders className="w-4 h-4 text-blue-600 shrink-0" />
-          <span className="text-xs font-bold text-slate-900">Target Deteksi:</span>
-          <span className="text-xs text-slate-600 hidden md:inline">
-            {detectionFilterMode === 'alphabet'
-              ? 'Fokus Alfabet (A–Z) — mencakup 24 huruf statis dan huruf gerak J & Z.'
-              : detectionFilterMode === 'all'
-              ? 'Otomatis — Alfabet A–Z, kata 1 & 2 tangan, serta gerakan dinamis aktif.'
-              : 'Kata & Sapaan — Memprioritaskan kata utuh dan sapaan cepat.'}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/80 self-stretch sm:self-auto justify-center">
-          <button
-            onClick={() => setDetectionFilterMode('alphabet')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              detectionFilterMode === 'alphabet'
-                ? 'bg-white text-blue-700 shadow-2xs border border-slate-200'
-                : 'text-slate-700 hover:text-slate-900'
-            }`}
-            title="Fokus Alfabet A-Z"
-          >
-            <Type className="w-3.5 h-3.5" />
-            <span>Fokus Huruf (A–Z)</span>
-          </button>
-          <button
-            onClick={() => setDetectionFilterMode('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              detectionFilterMode === 'all'
-                ? 'bg-white text-blue-700 shadow-2xs border border-slate-200'
-                : 'text-slate-700 hover:text-slate-900'
-            }`}
-            title="Deteksi seimbang antara huruf statis dan gerakan dinamis aktif"
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span>Otomatis (Semua)</span>
-          </button>
-          <button
-            onClick={() => setDetectionFilterMode('words')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              detectionFilterMode === 'words'
-                ? 'bg-white text-blue-700 shadow-2xs border border-slate-200'
-                : 'text-slate-700 hover:text-slate-900'
-            }`}
-            title="Prioritaskan kata-kata cepat dan sapaan"
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Kata &amp; Sapaan</span>
-          </button>
+          <div className="flex items-center gap-1.5 bg-[#EAE4D7] p-1 rounded-xl border-2 border-[#1C1917] self-stretch sm:self-auto justify-center">
+            <button
+              type="button"
+              onClick={() => setDetectionFilterMode('alphabet')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                detectionFilterMode === 'alphabet'
+                  ? 'bg-[#141210] text-[#FDE68A] shadow-[2px_2px_0px_#047857]'
+                  : 'text-[#44403C] hover:text-[#141210]'
+              }`}
+              title="Fokus Alfabet A-Z"
+            >
+              <Type className="w-3.5 h-3.5" />
+              <span>Fokus Huruf (A–Z)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDetectionFilterMode('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                detectionFilterMode === 'all'
+                  ? 'bg-[#141210] text-[#FDE68A] shadow-[2px_2px_0px_#047857]'
+                  : 'text-[#44403C] hover:text-[#141210]'
+              }`}
+              title="Deteksi seimbang antara huruf statis dan gerakan dinamis aktif"
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>Otomatis (Semua)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDetectionFilterMode('words')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                detectionFilterMode === 'words'
+                  ? 'bg-[#141210] text-[#FDE68A] shadow-[2px_2px_0px_#047857]'
+                  : 'text-[#44403C] hover:text-[#141210]'
+              }`}
+              title="Prioritaskan kata-kata cepat dan sapaan"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Kata &amp; Sapaan</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {cameraError && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start gap-2.5">
-          <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+        <div className="p-4 bg-[#FEE2E2] border-2 border-[#1C1917] shadow-[4px_4px_0px_#1C1917] rounded-2xl text-xs text-[#991B1B] flex items-start gap-2.5 font-bold">
+          <AlertCircle className="w-4 h-4 text-[#DC2626] shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold">Pemberitahuan Akses Kamera</p>
-            <p className="text-amber-800 mt-0.5">{cameraError}</p>
+            <p className="font-extrabold">Pemberitahuan Akses Kamera</p>
+            <p className="mt-0.5">{cameraError}</p>
           </div>
         </div>
       )}
 
-      {/* Main Grid */}
+      {/* Main Studio Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Camera / Hand Landmark Stage */}
-        <div className="lg:col-span-8 space-y-4">
-          <div className="bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 shadow-xl relative w-full aspect-[4/3] sm:aspect-[16/10] md:aspect-[16/9] min-h-[460px] sm:min-h-[520px] md:min-h-[580px] lg:min-h-[620px] flex flex-col items-center justify-center">
+        {/* Left Column (8 Cols): Camera Optical Stage & Diagnostics */}
+        <div className="lg:col-span-8 space-y-5">
+          <div className="bg-[#141210] rounded-3xl overflow-hidden border-2 border-[#1C1917] shadow-[6px_6px_0px_#1C1917] relative w-full aspect-[4/3] sm:aspect-[16/10] md:aspect-[16/9] min-h-[440px] sm:min-h-[500px] lg:min-h-[560px] flex flex-col items-center justify-center">
             <video
               ref={videoRef}
               autoPlay
@@ -813,33 +820,38 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
             />
 
             {!cameraActive && (
-              <div className="flex flex-col items-center justify-center text-center p-8 sm:p-12 text-slate-300 space-y-4 max-w-md">
-                <div className="w-20 h-20 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300">
-                  <Camera className="w-10 h-10 text-blue-400" />
+              <div className="flex flex-col items-center justify-center text-center p-8 sm:p-12 text-[#D6D3D1] space-y-5 max-w-md">
+                <div className="w-20 h-20 rounded-2xl bg-[#292524] border-2 border-[#FDE68A] shadow-[4px_4px_0px_#047857] flex items-center justify-center">
+                  <Camera className="w-10 h-10 text-[#FDE68A]" />
                 </div>
-                <div className="space-y-1.5">
-                  <p className="text-base sm:text-lg font-bold text-slate-100">
-                    Kamera Sedang Tidak Aktif
+                <div className="space-y-2">
+                  <span className="font-mono text-xs font-bold uppercase px-2.5 py-0.5 rounded bg-[#047857] text-white">
+                    OPTICAL HAND TRACKER // 21 LANDMARKS
+                  </span>
+                  <p className="font-display text-2xl font-extrabold text-[#FFFDF9]">
+                    Kamera Studio Siap Diaktifkan
                   </p>
-                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                    Klik tombol di bawah atau tombol di bagian atas untuk mengaktifkan webcam dan mulai membaca gerakan isyarat tangan Anda secara langsung.
+                  <p className="text-xs sm:text-sm text-[#D6D3D1] leading-relaxed">
+                    Nyalakan kamera untuk mendeteksi alfabet SIBI (A–Z), kata 1 tangan, maupun
+                    koordinasi 2 tangan secara langsung di perangkat Anda.
                   </p>
                 </div>
                 <button
                   id="btn-start-camera-center"
+                  type="button"
                   onClick={handleToggleCamera}
                   disabled={isModelLoading}
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold transition-all active:scale-98 cursor-pointer"
+                  className="tactile-btn inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-[#FDE68A] hover:bg-[#FCD34D] text-[#141210] text-xs sm:text-sm font-extrabold cursor-pointer"
                 >
                   {isModelLoading ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Menyiapkan Kamera...</span>
+                      <span>Menyiapkan Model AI...</span>
                     </>
                   ) : (
                     <>
                       <Camera className="w-4 h-4" />
-                      <span>Buka Kamera Sekarang</span>
+                      <span>Aktifkan Kamera Sekarang</span>
                     </>
                   )}
                 </button>
@@ -850,8 +862,8 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
               <div className="absolute inset-0 pointer-events-none p-4 flex flex-col justify-between">
                 {dynamicToast && (
                   <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
-                    <div className="bg-amber-400 text-slate-950 px-4 py-1.5 rounded-full font-bold text-xs sm:text-sm shadow-xl flex items-center gap-2 border border-amber-300">
-                      <CheckCircle2 className="w-4 h-4 text-slate-950" />
+                    <div className="bg-[#FDE68A] text-[#141210] px-4 py-1.5 rounded-xl font-bold text-xs sm:text-sm shadow-[3px_3px_0px_#1C1917] flex items-center gap-2 border-2 border-[#1C1917]">
+                      <CheckCircle2 className="w-4 h-4 text-[#047857]" />
                       <span>{dynamicToast}</span>
                     </div>
                   </div>
@@ -859,9 +871,11 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
 
                 {motionEnergy > 15 && handDetected && !dynamicToast && (
                   <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-                    <div className="bg-slate-950/85 backdrop-blur-md px-3 py-1 rounded-full border border-sky-400/50 text-sky-200 text-xs flex items-center gap-2">
-                      <Activity className="w-3.5 h-3.5 text-sky-400" />
-                      <span className="font-semibold tabular-nums">Membaca Gerakan Tangan ({motionEnergy}%)</span>
+                    <div className="bg-[#141210]/90 px-3 py-1 rounded-lg border border-[#FDE68A] text-[#FDE68A] text-xs flex items-center gap-2">
+                      <Activity className="w-3.5 h-3.5 text-[#FDE68A]" />
+                      <span className="font-mono font-bold tabular-nums">
+                        GERAK AKTIF ({motionEnergy}%)
+                      </span>
                     </div>
                   </div>
                 )}
@@ -870,60 +884,51 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md border ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border-2 border-[#1C1917] ${
                         handDetected
-                          ? 'bg-emerald-950/85 text-emerald-200 border-emerald-500/40'
-                          : 'bg-slate-950/75 text-amber-200 border-amber-500/30'
+                          ? 'bg-[#047857] text-white'
+                          : 'bg-[#FDE68A] text-[#141210]'
                       }`}
                     >
                       <span
                         className={`w-2 h-2 rounded-full ${
-                          handDetected ? 'bg-emerald-400' : 'bg-amber-400'
+                          handDetected ? 'bg-[#FDE68A]' : 'bg-[#C2410C]'
                         }`}
                       />
                       {handDetected
                         ? detectedHandCount >= 2
-                          ? '2 Tangan Terdeteksi (Kiri & Kanan)'
-                          : '1 Tangan Terbaca Jelas'
-                        : 'Arahkan Tangan ke Kamera...'}
+                          ? '2 TANGAN TERDETEKSI (KIRI & KANAN)'
+                          : '1 TANGAN TERBACA JELAS'
+                        : 'ARAHKAN TANGAN KE KAMERA'}
                     </span>
 
-                    <span className="text-xs text-white bg-slate-950/75 px-2.5 py-1 rounded-full font-mono backdrop-blur-xs border border-white/15 hidden sm:inline tabular-nums">
+                    <span className="text-xs text-[#FFFDF9] bg-[#141210]/90 px-2.5 py-1 rounded-lg font-mono font-bold border border-[#44403C] hidden sm:inline tabular-nums">
                       {fps} FPS
-                    </span>
-
-                    <span className="text-xs text-teal-200 bg-teal-950/85 px-2.5 py-1 rounded-full font-semibold backdrop-blur-xs border border-teal-500/40 hidden md:inline">
-                      {detectionFilterMode === 'alphabet' ? 'Mode: Huruf (A-Z)' : detectionFilterMode === 'words' ? 'Mode: Kata' : 'Mode: Otomatis'}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-white bg-slate-950/75 px-2.5 py-1 rounded-full backdrop-blur-xs border border-white/15 flex items-center gap-1.5">
-                      <Hand className="w-3.5 h-3.5 text-teal-400" />
-                      <span>IsyaratKita</span>
-                    </span>
-
                     {autoCommit && handDetected && (
-                      <div className="flex items-center gap-2 bg-slate-950/85 backdrop-blur-md px-3 py-1 rounded-full border border-teal-500/40">
+                      <div className="flex items-center gap-2 bg-[#141210]/90 px-3 py-1.5 rounded-xl border border-[#FDE68A]">
                         <Zap
                           className={`w-3.5 h-3.5 ${
-                            isStabilizing ? 'text-amber-400' : 'text-teal-400'
+                            isStabilizing ? 'text-[#FDE68A]' : 'text-[#34D399]'
                           }`}
                         />
                         <div className="flex flex-col">
-                          <span className="text-xs font-mono text-teal-200 font-bold whitespace-nowrap tabular-nums">
+                          <span className="text-xs font-mono text-[#FFFDF9] font-bold whitespace-nowrap tabular-nums">
                             {isStabilizing
                               ? 'Menstabilkan...'
                               : `${readingStatus} (${Math.round(holdProgress)}%)`}
                           </span>
-                          <div className="w-20 h-1.5 bg-slate-700 rounded-full overflow-hidden mt-0.5">
+                          <div className="w-20 h-1.5 bg-[#44403C] rounded-full overflow-hidden mt-0.5">
                             <div
                               className={`h-full transition-all duration-75 ${
                                 isStabilizing
-                                  ? 'bg-amber-400'
+                                  ? 'bg-[#FDE68A]'
                                   : holdProgress >= 90
-                                  ? 'bg-emerald-400'
-                                  : 'bg-teal-400'
+                                  ? 'bg-[#34D399]'
+                                  : 'bg-[#60A5FA]'
                               }`}
                               style={{ width: `${holdProgress}%` }}
                             />
@@ -935,113 +940,93 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                 </div>
 
                 {!handDetected && (
-                  <div className="w-48 h-48 sm:w-56 sm:h-56 mx-auto rounded-3xl border-2 border-dashed border-teal-400/50 bg-teal-500/5 flex flex-col items-center justify-center text-center p-4">
-                    <Hand className="w-8 h-8 text-teal-300 mb-2" />
-                    <span className="text-xs text-teal-100 font-medium bg-slate-950/75 px-3 py-1 rounded-full">
-                      Posisikan Tangan di Depan Kamera
+                  <div className="w-48 h-48 sm:w-56 sm:h-56 mx-auto rounded-3xl border-2 border-dashed border-[#FDE68A]/70 bg-[#141210]/40 flex flex-col items-center justify-center text-center p-4">
+                    <Hand className="w-8 h-8 text-[#FDE68A] mb-2" />
+                    <span className="font-mono text-xs text-[#FFFDF9] font-bold bg-[#141210] px-3 py-1 rounded-lg border border-[#44403C]">
+                      Posisikan Tangan di Bingkai
                     </span>
                   </div>
                 )}
 
-                {/* Bottom HUD: Detection Card */}
-                <div className="flex items-end justify-between">
-                  <div className="bg-slate-950/85 backdrop-blur-md p-3 rounded-2xl border border-white/15 flex items-center gap-3">
-                    <div className="min-w-12 h-12 px-2 rounded-xl bg-teal-600 text-white flex items-center justify-center font-mono font-black text-xl sm:text-2xl text-center">
+                {/* Bottom HUD: Live Detection Readout */}
+                <div className="flex items-end justify-between gap-2">
+                  <div className="bg-[#141210]/95 p-3 rounded-2xl border-2 border-[#FFFDF9]/20 flex items-center gap-3">
+                    <div className="min-w-12 h-12 px-2.5 rounded-xl bg-[#FDE68A] text-[#141210] flex items-center justify-center font-display font-extrabold text-xl sm:text-2xl text-center">
                       {detectedLetter}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-bold text-white uppercase tracking-wider">
-                          Isyarat:
-                        </span>
-                        <span className="text-xs font-mono font-bold text-teal-300 tabular-nums">
-                          {detectionConfidence}% Akurat
+                        <span className="font-mono text-xs font-bold text-[#FDE68A] tabular-nums">
+                          {detectionConfidence}% AKURAT
                         </span>
                         {isDynamicGesture && (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-amber-400 text-slate-950">
+                          <span className="inline-flex items-center gap-1 font-mono text-xs font-bold px-2 py-0.5 rounded bg-[#C2410C] text-white">
                             <Zap className="w-3 h-3" />
-                            <span>Gerakan Mengayun</span>
+                            <span>DINAMIS</span>
                           </span>
                         )}
                         {isTwoHandDetectedWord && (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-cyan-400 text-slate-950">
+                          <span className="inline-flex items-center gap-1 font-mono text-xs font-bold px-2 py-0.5 rounded bg-[#047857] text-white">
                             <Hand className="w-3 h-3" />
-                            <span>2 Tangan ({detectedLetter})</span>
-                          </span>
-                        )}
-                        {gestureType === 'word' && !isDynamicGesture && !isTwoHandDetectedWord && (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950">
-                            Kata Utuh
+                            <span>2 TANGAN</span>
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-200 mt-0.5 max-w-[220px] sm:max-w-xs truncate">
+                      <p className="text-xs text-[#D6D3D1] mt-0.5 max-w-[220px] sm:max-w-xs truncate">
                         {gestureDescription}
                       </p>
                     </div>
                   </div>
 
                   <button
+                    type="button"
                     onClick={handleAnalyzeWithGemini}
-                    className="pointer-events-auto inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 font-bold text-xs shadow-lg transition-transform active:scale-95 cursor-pointer"
+                    className="pointer-events-auto tactile-btn inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#FDE68A] hover:bg-[#FCD34D] text-[#141210] font-bold text-xs cursor-pointer"
                     title="Periksa apakah posisi jari Anda sudah tepat menurut AI"
                   >
-                    <Sparkles className="w-4 h-4 text-slate-950" />
-                    <span className="hidden sm:inline">Cek Posisi Tangan</span>
+                    <Sparkles className="w-4 h-4 text-[#141210]" />
+                    <span className="hidden sm:inline">Evaluasi AI</span>
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Dynamic Gesture & Movement Tips Bar */}
-          <div className="liquid-glass rounded-2xl p-3.5 border border-slate-200/90 flex items-start gap-2.5 text-xs">
-            <Sparkles className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-            <div className="space-y-0.5">
-              <span className="font-bold text-slate-900">
-                Tips Isyarat Gerakan &amp; Kata:
-              </span>
-              <p className="text-slate-600 leading-relaxed text-xs">
-                Aplikasi mengenali gerakan mengayun: <strong>Huruf Z</strong> (lukis huruf Z di udara), <strong>Huruf J</strong> (gerakkan kelingking melengkung), <strong>Halo</strong> (lambaikan tangan), <strong>Ya</strong> (anggukkan kepalan tangan), <strong>Tidak</strong> (gelengkan telunjuk), <strong>Bagus</strong> (acungkan jempol).
-              </p>
-            </div>
-          </div>
-
           {/* Real-time Finger State Diagnostics & Vision Controls */}
-          <div className="liquid-glass rounded-3xl p-5 border border-slate-200/90 space-y-3.5">
-            <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+          <div className="bg-[#FFFDF9] rounded-3xl p-5 border-2 border-[#1C1917] shadow-[5px_5px_0px_#1C1917] space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-[#EAE4D7] pb-3">
               <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-blue-600" />
-                <span className="text-xs font-bold text-slate-900">
-                  Status Posisi Jari {isDebugMode && debugSummary ? `(${debugSummary})` : ''}
+                <Activity className="w-4 h-4 text-[#047857]" />
+                <span className="font-mono text-xs font-bold uppercase text-[#141210]">
+                  Telemetri Sendi Jari {isDebugMode && debugSummary ? `(${debugSummary})` : ''}
                 </span>
               </div>
 
               <div className="flex items-center gap-2 text-xs">
                 <button
+                  type="button"
                   onClick={() => setShowSkeleton(!showSkeleton)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                  className={`tactile-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold cursor-pointer ${
                     showSkeleton
-                      ? 'bg-blue-50 text-blue-800 border-blue-200 font-semibold'
-                      : 'bg-white text-slate-700 border-slate-200'
+                      ? 'bg-[#D1FAE5] text-[#065F46]'
+                      : 'bg-[#F6F3EC] text-[#44403C]'
                   }`}
-                  title="Tampilkan garis panduan tangan"
                 >
                   {showSkeleton ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                  <span>Garis Tangan</span>
+                  <span>Kerangka 21-Titik</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => setAutoCommit(!autoCommit)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                  className={`tactile-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold cursor-pointer ${
                     autoCommit
-                      ? 'bg-blue-50 text-blue-800 border-blue-200 font-semibold'
-                      : 'bg-white text-slate-700 border-slate-200'
+                      ? 'bg-[#FDE68A] text-[#141210]'
+                      : 'bg-[#F6F3EC] text-[#44403C]'
                   }`}
-                  title="Ketik otomatis saat gerakan tangan ditahan sejenak"
                 >
                   <Zap className="w-3.5 h-3.5" />
-                  <span>Ketik Otomatis ({autoCommit ? 'Aktif' : 'Mati'})</span>
+                  <span>Ketik Otomatis: {autoCommit ? 'ON' : 'OFF'}</span>
                 </button>
               </div>
             </div>
@@ -1053,87 +1038,43 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                 { label: 'Telunjuk', state: fingerStates.index },
                 { label: 'Tengah', state: fingerStates.middle },
                 { label: 'Manis', state: fingerStates.ring },
-                { label: 'Kelingking', state: fingerStates.pinky }
+                { label: 'Kelingking', state: fingerStates.pinky },
               ].map((item) => (
                 <div
                   key={item.label}
-                  className={`py-2 px-1.5 rounded-xl border transition-colors ${
+                  className={`py-2 px-1.5 rounded-xl border-2 border-[#1C1917] transition-colors ${
                     item.state
-                      ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold'
-                      : 'bg-slate-50 border-slate-200 text-slate-600'
+                      ? 'bg-[#D1FAE5] text-[#065F46] font-extrabold'
+                      : 'bg-[#F6F3EC] text-[#57534E] font-medium'
                   }`}
                 >
-                  <span className="block text-xs text-slate-600 font-medium">{item.label}</span>
-                  <span className="text-xs">{item.state ? 'Tegak' : 'Terlipat'}</span>
+                  <span className="block font-mono text-xs uppercase">{item.label}</span>
+                  <span className="text-xs font-bold">{item.state ? 'TEGAK' : 'LIPAT'}</span>
                 </div>
               ))}
             </div>
 
-            {/* Jeda Baca AI / Accuracy Hold Delay Setting */}
-            <div className="pt-3 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
-              <div>
-                <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-teal-700" />
-                  Jeda Baca AI (Stabilisasi):
+            {/* Hold Pause & Motion Energy Controls */}
+            <div className="pt-3 border-t-2 border-[#EAE4D7] grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="flex flex-col justify-between gap-2">
+                <span className="font-mono font-bold text-[#141210] uppercase flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#047857]" />
+                  Jeda Tahan Ketik Otomatis:
                 </span>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Waktu jeda AI membaca &amp; memvalidasi gestur agar terjemahan tepat dan tidak salah ketik.
-                </p>
-              </div>
-
-              <div className="inline-flex bg-slate-100 p-1 rounded-xl text-xs font-semibold shrink-0 self-start sm:self-auto">
-                {[
-                  { key: 'cepat', label: 'Cepat (0.8s)' },
-                  { key: 'akurat', label: 'Akurat (1.1s)' },
-                  { key: 'teliti', label: 'Teliti (1.6s)' }
-                ].map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setAiReadingPause(key as 'cepat' | 'akurat' | 'teliti')}
-                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer tabular-nums ${
-                      aiReadingPause === key
-                        ? 'bg-white text-teal-900 shadow-2xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Real-time Motion Energy Bar & Dynamic Sensitivity Controls */}
-            <div className="pt-3 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2 flex-1">
-                <span className="text-xs font-bold text-slate-700 shrink-0">
-                  Keaktifan Gerak:
-                </span>
-                <div className="flex-1 bg-slate-200 h-2 rounded-full overflow-hidden max-w-[140px] sm:max-w-[180px]">
-                  <div
-                    className="h-full rounded-full transition-all duration-100 bg-gradient-to-r from-teal-500 to-amber-500"
-                    style={{ width: `${motionEnergy}%` }}
-                  />
-                </div>
-                <span className="font-mono font-bold text-slate-800 text-xs tabular-nums">
-                  {motionEnergy}%
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                <span className="text-xs text-slate-600 font-medium">Sensitivitas Gerak:</span>
-                <div className="inline-flex bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+                <div className="inline-flex bg-[#EAE4D7] p-1 rounded-xl border border-[#1C1917] self-start">
                   {[
-                    { key: 'normal', label: 'Santai' },
-                    { key: 'tinggi', label: 'Sedang' },
-                    { key: 'responsif', label: 'Cepat' }
+                    { key: 'cepat', label: 'Cepat (0.8s)' },
+                    { key: 'akurat', label: 'Standar (1.1s)' },
+                    { key: 'teliti', label: 'Teliti (1.6s)' },
                   ].map(({ key, label }) => (
                     <button
                       key={key}
-                      onClick={() => setDynamicSensitivity(key as 'normal' | 'tinggi' | 'responsif')}
-                      className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
-                        dynamicSensitivity === key
-                          ? 'bg-white text-teal-900 shadow-2xs font-bold'
-                          : 'text-slate-600 hover:text-slate-900'
+                      type="button"
+                      onClick={() => setAiReadingPause(key as 'cepat' | 'akurat' | 'teliti')}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer tabular-nums ${
+                        aiReadingPause === key
+                          ? 'bg-[#141210] text-[#FDE68A]'
+                          : 'text-[#44403C] hover:text-[#141210]'
                       }`}
                     >
                       {label}
@@ -1141,154 +1082,206 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
                   ))}
                 </div>
               </div>
+
+              <div className="flex flex-col justify-between gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-[#141210] uppercase">
+                    Sensitivitas &amp; Energi Gerak:
+                  </span>
+                  <span className="font-mono font-bold text-[#047857] tabular-nums">
+                    {motionEnergy}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-[#EAE4D7] h-2.5 rounded-full overflow-hidden border border-[#1C1917]">
+                    <div
+                      className="h-full transition-all duration-100 bg-[#047857]"
+                      style={{ width: `${motionEnergy}%` }}
+                    />
+                  </div>
+                  <div className="inline-flex bg-[#EAE4D7] p-1 rounded-xl border border-[#1C1917]">
+                    {[
+                      { key: 'normal', label: 'Santai' },
+                      { key: 'tinggi', label: 'Sedang' },
+                      { key: 'responsif', label: 'Cepat' },
+                    ].map(({ key, label }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() =>
+                          setDynamicSensitivity(key as 'normal' | 'tinggi' | 'responsif')
+                        }
+                        className={`px-2 py-0.5 rounded-lg font-bold transition-all cursor-pointer ${
+                          dynamicSensitivity === key
+                            ? 'bg-[#141210] text-[#FDE68A]'
+                            : 'text-[#44403C] hover:text-[#141210]'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Translated Speech & Text Output Panel (Flattened hierarchy) */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="liquid-glass rounded-3xl p-5 border border-slate-200/90 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
-              <span className="text-sm font-bold text-slate-900">
-                Hasil Terjemahan
+        {/* Right Column (4 Cols): Live Readout & Sentence Tape */}
+        <div className="lg:col-span-4 space-y-5">
+          <div className="bg-[#FFFDF9] rounded-3xl border-2 border-[#1C1917] shadow-[6px_6px_0px_#1C1917] overflow-hidden">
+            {/* Top Strip */}
+            <div className="bg-[#141210] text-[#FFFDF9] px-5 py-3.5 border-b-2 border-[#1C1917] flex items-center justify-between">
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#FDE68A]">
+                PAPAN BACA &amp; PERANGKAI KALIMAT
               </span>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
-                Suara Langsung
+              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[#047857] text-white">
+                TTS ID-ID
               </span>
             </div>
 
-            {/* Active Character Preview (flat section) */}
-            <div className="flex items-center justify-between py-1">
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
-                  <HandSignIllustration signId={detectedLetter.toLowerCase()} size={48} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono font-black text-2xl text-slate-900">
-                      {detectedLetter || '-'}
-                    </span>
-                    {isDynamicGesture ? (
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200">
-                        Gerakan Mengayun
-                      </span>
-                    ) : (
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
-                        Terbaca
-                      </span>
-                    )}
+            <div className="p-5 space-y-4">
+              {/* Active Character Readout Specimen */}
+              <div className="p-3.5 rounded-2xl bg-[#F6F3EC] border-2 border-[#1C1917] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-xl bg-[#FFFDF9] border border-[#1C1917] flex items-center justify-center overflow-hidden shrink-0">
+                    <HandSignIllustration signId={detectedLetter.toLowerCase()} size={48} />
                   </div>
-                  <span className="text-xs text-slate-600 block tabular-nums">
-                    Kecocokan: {detectionConfidence}%
-                  </span>
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-display font-extrabold text-2xl text-[#141210]">
+                        {detectedLetter || '-'}
+                      </span>
+                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[#FDE68A] text-[#141210] border border-[#1C1917] tabular-nums">
+                        {detectionConfidence}%
+                      </span>
+                    </div>
+                    <span className="text-xs font-medium text-[#57534E] block">
+                      {isDynamicGesture ? 'Gestur Dinamis' : 'Gestur Terbaca'}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleAddLetter(detectedLetter)}
+                  className="tactile-btn px-3.5 py-2 rounded-xl bg-[#047857] text-white text-xs font-bold cursor-pointer"
+                  title="Tambahkan ke dalam kalimat"
+                >
+                  + Tambah
+                </button>
+              </div>
+
+              {/* Output Transcript Box */}
+              <div className="space-y-2">
+                <label className="font-mono text-xs font-bold uppercase tracking-wider text-[#141210] block">
+                  Pita Kalimat Hasil Terjemahan:
+                </label>
+
+                <div className="min-h-[120px] p-4 rounded-2xl bg-[#F6F3EC] border-2 border-[#1C1917] text-[#141210] font-bold text-base sm:text-lg flex flex-wrap items-baseline gap-1.5 break-words">
+                  {sentenceBuffer && <span>{sentenceBuffer}</span>}
+                  {wordBuffer && (
+                    <span className="text-[#1D4ED8] font-extrabold underline decoration-[#1D4ED8] decoration-2 underline-offset-4">
+                      {wordBuffer}
+                    </span>
+                  )}
+                  {!fullDisplayResult && (
+                    <span className="text-[#57534E] text-xs font-medium">
+                      Peragakan isyarat di depan kamera atau tekan tombol &ldquo;+ Tambah&rdquo; di
+                      atas untuk merangkai kalimat...
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <button
-                onClick={() => handleAddLetter(detectedLetter)}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors active:scale-95 cursor-pointer"
-                title="Ketik huruf ini ke dalam kalimat"
-              >
-                + Tambah
-              </button>
-            </div>
-
-            {/* Output Transcript Box */}
-            <div className="space-y-2 border-t border-slate-200/80 pt-3.5">
-              <label className="text-xs font-bold text-slate-700 block">
-                Kalimat yang Dirangkai:
-              </label>
-
-              <div className="min-h-[110px] p-4 rounded-2xl bg-white/90 border border-slate-200 text-slate-900 font-medium text-base sm:text-lg flex flex-wrap items-baseline gap-1.5 break-words">
-                {sentenceBuffer && <span>{sentenceBuffer}</span>}
-                {wordBuffer && (
-                  <span className="text-blue-700 font-bold underline decoration-blue-400 decoration-2 underline-offset-4">
-                    {wordBuffer}
-                  </span>
-                )}
-                {!fullDisplayResult && (
-                  <span className="text-slate-600 text-xs italic">
-                    Peragakan isyarat di kamera atau gunakan tombol tambah di atas...
-                  </span>
-                )}
+              {/* Quick Editing Actions */}
+              <div className="flex items-center gap-2">
+                <button
+                  id="btn-buffer-backspace"
+                  type="button"
+                  onClick={handleBackspace}
+                  className="tactile-btn flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold bg-[#FFFDF9] hover:bg-[#EAE4D7] text-[#141210] cursor-pointer"
+                >
+                  <Delete className="w-3.5 h-3.5" />
+                  <span>Hapus Huruf</span>
+                </button>
+                <button
+                  id="btn-buffer-space"
+                  type="button"
+                  onClick={handleAddSpace}
+                  className="tactile-btn flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold bg-[#FFFDF9] hover:bg-[#EAE4D7] text-[#141210] cursor-pointer"
+                >
+                  <Space className="w-3.5 h-3.5" />
+                  <span>Spasi</span>
+                </button>
+                <button
+                  id="btn-buffer-clear"
+                  type="button"
+                  onClick={handleClearAll}
+                  className="tactile-btn p-2.5 rounded-xl text-xs bg-[#FEE2E2] hover:bg-[#FECACA] text-[#991B1B] cursor-pointer"
+                  title="Hapus Semua Tulisan"
+                  aria-label="Hapus Semua Tulisan"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
-            </div>
 
-            {/* Quick Editing Actions (Backspace, Space, Clear) */}
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                id="btn-buffer-backspace"
-                onClick={handleBackspace}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 transition-colors active:scale-95 cursor-pointer"
-              >
-                <Delete className="w-3.5 h-3.5" />
-                <span>Hapus Huruf</span>
-              </button>
-              <button
-                id="btn-buffer-space"
-                onClick={handleAddSpace}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 transition-colors active:scale-95 cursor-pointer"
-              >
-                <Space className="w-3.5 h-3.5" />
-                <span>Beri Spasi</span>
-              </button>
-              <button
-                id="btn-buffer-clear"
-                onClick={handleClearAll}
-                className="p-2.5 rounded-xl text-xs text-rose-700 hover:bg-rose-50 border border-rose-200 transition-colors active:scale-95 cursor-pointer"
-                title="Hapus Semua Tulisan"
-                aria-label="Hapus Semua Tulisan"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
+              {/* Primary Action Buttons: Speak & Copy */}
+              <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
+                <button
+                  id="btn-speak-sign-result"
+                  type="button"
+                  onClick={() => speakText(fullDisplayResult)}
+                  disabled={!fullDisplayResult}
+                  className="tactile-btn flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-extrabold bg-[#047857] hover:bg-[#065F46] text-white disabled:opacity-40 cursor-pointer"
+                >
+                  <Volume2 className="w-4 h-4" />
+                  <span>Suarakan Kalimat</span>
+                </button>
 
-            {/* Primary Action Buttons: Speak & Copy */}
-            <div className="pt-3 border-t border-slate-200/80 flex flex-col sm:flex-row gap-2.5">
-              <button
-                id="btn-speak-sign-result"
-                onClick={() => speakText(fullDisplayResult)}
-                disabled={!fullDisplayResult}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 transition-all active:scale-95 cursor-pointer"
-              >
-                <Volume2 className="w-4 h-4" />
-                <span>Bunyikan Suara Kalimat</span>
-              </button>
-
-              <button
-                id="btn-copy-sign-result"
-                onClick={handleCopy}
-                disabled={!fullDisplayResult}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
-                title="Salin tulisan ini"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-600" />
-                    <span className="text-emerald-700 font-bold">Tersalin</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    <span>Salin Tulisan</span>
-                  </>
-                )}
-              </button>
+                <button
+                  id="btn-copy-sign-result"
+                  type="button"
+                  onClick={handleCopy}
+                  disabled={!fullDisplayResult}
+                  className="tactile-btn inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl text-xs font-bold bg-[#FDE68A] hover:bg-[#FCD34D] text-[#141210] disabled:opacity-40 cursor-pointer"
+                  title="Salin tulisan ini"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4 text-[#047857]" />
+                      <span>Tersalin</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>Salin</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Information Callout */}
-          <div className="liquid-glass rounded-3xl p-4 border border-slate-200/90 text-xs text-slate-600 space-y-2">
-            <p className="font-bold text-slate-900 flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-blue-600" />
-              <span>Tips Penggunaan Kamera Isyarat</span>
+          {/* Reference Guide Card */}
+          <div className="bg-[#FFFDF9] rounded-3xl p-5 border-2 border-[#1C1917] shadow-[5px_5px_0px_#1C1917] text-xs text-[#44403C] space-y-2.5">
+            <p className="font-mono font-bold uppercase text-[#141210] flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-[#C2410C]" />
+              <span>Panduan Gestur 1 &amp; 2 Tangan</span>
             </p>
-            <p className="leading-relaxed">
-              Kamera membaca gerakan tangan Anda langsung di perangkat. Aktifkan fitur <strong>&ldquo;Ketik Otomatis&rdquo;</strong> agar kata atau huruf langsung terangkai saat gestur tangan ditahan atau diselesaikan.
-            </p>
-            <div className="pt-2 border-t border-slate-200/80 space-y-1.5 text-xs text-slate-600">
-              <p><strong>Gestur 2 Tangan:</strong> <em>Terima Kasih</em> (dua telapak merapat/mengatup di dada), <em>Sama-sama</em> (dua telapak terbuka santun), <em>Tolong</em> (tangan bertumpuk), <em>Perkenalkan</em> (dua tangan huruf H menyilang).</p>
-              <p><strong>Gerak Dinamis &amp; Sapaan:</strong> <em>Halo</em> (lambaian tangan), <em>Terima Kasih</em> (dorong maju dari dagu), <em>Maaf</em> (putar melingkar di dada), <em>Ya</em> (angguk kepalan), <em>Tidak</em> (geleng telunjuk), <em>Saya</em> (tunjuk dada), <em>Bagus</em> (jempol mantap), <em>Sayang</em> (ILY), <em>Z</em> &amp; <em>J</em> (pola goresan udara).</p>
+            <div className="space-y-2 pt-1 border-t border-[#EAE4D7]">
+              <p>
+                <strong className="text-[#141210]">4 Gestur 2 Tangan:</strong>{' '}
+                <em>Terima Kasih</em> (dua telapak merapat di dada), <em>Sama-sama</em> (dua
+                telapak terbuka), <em>Tolong</em> (tangan bertumpuk), <em>Perkenalkan</em> (dua
+                tangan huruf H menyilang).
+              </p>
+              <p>
+                <strong className="text-[#141210]">Gestur Gerak &amp; Kata:</strong>{' '}
+                <em>Halo</em> (lambaian), <em>Maaf</em> (putar di dada), <em>Ya</em> (angguk
+                kepalan), <em>Tidak</em> (geleng telunjuk), <em>Saya</em> (tunjuk dada),{' '}
+                <em>Bagus</em> (jempol), <em>Sayang</em> (ILY), serta <em>J</em> &amp; <em>Z</em>.
+              </p>
             </div>
           </div>
         </div>
@@ -1298,102 +1291,111 @@ export const SignToSpeechView: React.FC<SignToSpeechViewProps> = ({
       {isGeminiModalOpen && (
         <div
           id="gemini-inspection-modal-overlay"
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 bg-[#141210]/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
           onClick={() => setIsGeminiModalOpen(false)}
         >
           <div
             id="gemini-inspection-modal-content"
-            className="liquid-glass-modal rounded-3xl max-w-lg w-full p-6 border border-white/60 space-y-4"
+            className="bg-[#FFFDF9] rounded-3xl max-w-lg w-full overflow-hidden border-2 border-[#1C1917] shadow-[8px_8px_0px_#1C1917]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+            <div className="bg-[#141210] text-[#FFFDF9] px-6 py-4 border-b-2 border-[#1C1917] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-[#FDE68A] text-[#141210] flex items-center justify-center">
                   <Bot className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-slate-900">
-                    Bantuan Cek Posisi Tangan
+                  <h3 className="font-display font-extrabold text-base text-white">
+                    Evaluasi Anatomi Gestur AI
                   </h3>
-                  <p className="text-xs text-slate-600">
-                    Pemeriksaan ketepatan bentuk isyarat tangan Anda
+                  <p className="font-mono text-xs text-[#D6D3D1]">
+                    Pemeriksaan ketepatan posisi sendi jari SIBI
                   </p>
                 </div>
               </div>
 
               <button
+                type="button"
                 onClick={() => setIsGeminiModalOpen(false)}
-                className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 cursor-pointer"
+                className="p-1.5 rounded-lg bg-[#292524] hover:bg-[#44403C] text-white cursor-pointer"
                 aria-label="Tutup dialog pemeriksaan AI"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {isAnalyzingWithGemini ? (
-              <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
-                <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
-                <div>
-                  <p className="text-sm font-bold text-slate-900">
-                    Sedang Memeriksa Posisi Tangan...
-                  </p>
-                  <p className="text-xs text-slate-600 mt-1">
-                    Memeriksa kelengkungan jari dan posisi tangan Anda
-                  </p>
-                </div>
-              </div>
-            ) : geminiResult ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+            <div className="p-6 space-y-4">
+              {isAnalyzingWithGemini ? (
+                <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
+                  <RefreshCw className="w-8 h-8 text-[#1D4ED8] animate-spin" />
                   <div>
-                    <span className="text-xs text-blue-800 font-semibold block">
-                      Huruf / Kata Terbaca
-                    </span>
-                    <span className="font-mono font-black text-2xl text-slate-900">
-                      {geminiResult.sign || (detectedLetter && detectedLetter !== '?' ? detectedLetter : 'A')}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs text-blue-800 font-semibold block">
-                      Tingkat Kecocokan
-                    </span>
-                    <span className="font-mono font-bold text-lg text-emerald-700 tabular-nums">
-                      {geminiResult.confidence || `${detectionConfidence || 90}%`}
-                    </span>
+                    <p className="font-display text-base font-extrabold text-[#141210]">
+                      Memeriksa Posisi Tangan Anda...
+                    </p>
+                    <p className="text-xs text-[#44403C] mt-1">
+                      Menganalisis tekukan sendi dan orientasi telapak tangan
+                    </p>
                   </div>
                 </div>
-
-                <div className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-slate-900">Hasil Pemeriksaan:</h4>
-                  <p className="text-xs text-slate-700 leading-relaxed">
-                    {geminiResult.feedback ||
-                      'Posisi tangan terdeteksi dengan baik. Pastikan seluruh jari berada di dalam bingkai kamera.'}
-                  </p>
-                </div>
-
-                {geminiResult.suggestions && geminiResult.suggestions.length > 0 && (
-                  <div className="space-y-2 border-t border-slate-200/80 pt-3">
-                    <h4 className="text-xs font-bold text-slate-900">Saran untuk Anda:</h4>
-                    <ul className="space-y-1.5 text-xs text-slate-700">
-                      {geminiResult.suggestions.map((sug, i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                          <span>{sug}</span>
-                        </li>
-                      ))}
-                    </ul>
+              ) : geminiResult ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between bg-[#F6F3EC] p-4 rounded-2xl border-2 border-[#1C1917]">
+                    <div>
+                      <span className="font-mono text-xs font-bold uppercase text-[#57534E] block">
+                        Isyarat Terbaca
+                      </span>
+                      <span className="font-display font-extrabold text-2xl text-[#141210]">
+                        {geminiResult.sign ||
+                          (detectedLetter && detectedLetter !== '?' ? detectedLetter : 'A')}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-mono text-xs font-bold uppercase text-[#57534E] block">
+                        Tingkat Akurasi
+                      </span>
+                      <span className="font-mono font-extrabold text-xl text-[#047857] tabular-nums">
+                        {geminiResult.confidence || `${detectionConfidence || 90}%`}
+                      </span>
+                    </div>
                   </div>
-                )}
+
+                  <div className="space-y-1.5">
+                    <h4 className="font-mono text-xs font-bold uppercase text-[#141210]">
+                      Umpan Balik Formasi:
+                    </h4>
+                    <p className="text-xs sm:text-sm text-[#44403C] leading-relaxed font-medium">
+                      {geminiResult.feedback ||
+                        'Posisi tangan terdeteksi dengan baik. Pastikan seluruh jari berada di dalam bingkai kamera.'}
+                    </p>
+                  </div>
+
+                  {geminiResult.suggestions && geminiResult.suggestions.length > 0 && (
+                    <div className="space-y-2 border-t-2 border-[#EAE4D7] pt-3">
+                      <h4 className="font-mono text-xs font-bold uppercase text-[#141210]">
+                        Tips Penyempurnaan:
+                      </h4>
+                      <ul className="space-y-1.5 text-xs text-[#44403C] font-medium">
+                        {geminiResult.suggestions.map((sug, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-[#047857] shrink-0 mt-0.5" />
+                            <span>{sug}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsGeminiModalOpen(false)}
+                  className="tactile-btn px-5 py-2.5 rounded-xl bg-[#141210] text-[#FFFDF9] font-bold text-xs cursor-pointer"
+                >
+                  Tutup Evaluasi
+                </button>
               </div>
-            ) : null}
-
-            <div className="pt-2 flex justify-end">
-              <button
-                onClick={() => setIsGeminiModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition-colors cursor-pointer"
-              >
-                Tutup
-              </button>
             </div>
           </div>
         </div>
