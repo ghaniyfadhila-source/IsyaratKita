@@ -1,0 +1,6 @@
+# robots.txt for IsyaratKita (https://isyaratkita.web.id)
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://isyaratkita.web.id/sitemap.xml
