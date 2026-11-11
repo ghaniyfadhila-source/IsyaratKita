@@ -18,6 +18,7 @@ interface NavbarProps {
   onOpenModules: () => void;
   onOpenAbout: () => void;
   onOpenTestGuide: () => void;
+  onOpenFaq?: () => void;
   onScrollToTop: () => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
@@ -30,6 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenModules,
   onOpenAbout,
   onOpenTestGuide,
+  onOpenFaq,
   onScrollToTop,
   soundEnabled,
   onToggleSound,
@@ -136,6 +138,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Panduan</span>
           </button>
 
+          {onOpenFaq && (
+            <button
+              id="nav-btn-faq"
+              type="button"
+              onClick={onOpenFaq}
+              className="tactile-btn flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#FFFDF9] text-[#141210] hover:bg-[#EAE4D7] cursor-pointer"
+            >
+              <HelpCircle className="w-4 h-4 text-[#7C3AED]" />
+              <span>FAQ</span>
+            </button>
+          )}
+
           <button
             id="nav-btn-sound-toggle"
             type="button"
@@ -222,6 +236,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               <HelpCircle className="w-4 h-4 text-[#C2410C]" />
               <span>Panduan Uji</span>
             </button>
+            {onOpenFaq && (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenFaq();
+                  setMobileMenuOpen(false);
+                }}
+                className="tactile-btn flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold bg-[#F6F3EC] text-[#141210]"
+              >
+                <HelpCircle className="w-4 h-4 text-[#7C3AED]" />
+                <span>FAQ &amp; Edukasi</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {

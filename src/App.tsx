@@ -9,6 +9,7 @@ import { SignToSpeechView } from './components/SignToSpeechView';
 import { DictionaryModal } from './components/DictionaryModal';
 import { TestingGuideModal } from './components/TestingGuideModal';
 import { ContactModal } from './components/ContactModal';
+import { FaqSection } from './components/FaqSection';
 import { getSavedHistory, saveHistoryItem } from './utils/historyStorage';
 import { Sparkles, CheckCircle2, HeartHandshake, ShieldCheck } from 'lucide-react';
 
@@ -49,6 +50,13 @@ export default function App() {
     }
   };
 
+  const handleScrollToFaq = () => {
+    const section = document.getElementById('faq-section');
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const handlePracticeInCamera = (_sign: SibiSign) => {
     setCurrentMode('sign-to-speech');
     setTimeout(() => {
@@ -80,6 +88,7 @@ export default function App() {
         onOpenModules={handleScrollToModules}
         onOpenAbout={() => setIsContactOpen(true)}
         onOpenTestGuide={() => setIsTestGuideOpen(true)}
+        onOpenFaq={handleScrollToFaq}
         onScrollToTop={handleScrollToTop}
         soundEnabled={soundEnabled}
         onToggleSound={() => setSoundEnabled((prev) => !prev)}
@@ -168,6 +177,9 @@ export default function App() {
           onPracticeInCamera={handlePracticeInCamera}
           onSpeak={handleSpeak}
         />
+
+        {/* Semantic Educational FAQ Section for Users & Search Crawlers */}
+        <FaqSection />
       </main>
 
       {/* Tactile Editorial Footer */}
